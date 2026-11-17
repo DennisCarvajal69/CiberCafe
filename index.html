@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>LevelUp Arcade Bar</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0b1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
+  <script src="script.js" defer></script>
+
+  <script>
+    // Captura temprana del evento de instalación (puede dispararse antes de que cargue script.js)
+    window.__instalar = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__instalar = e;
+    });
+
+    // Registro del Service Worker (soporte offline)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js')
+          .then(function (reg) { console.log('Service Worker PWA registrado:', reg.scope); })
+          .catch(function (err) { console.error('Fallo en registro de SW:', err); });
+      });
+    }
+  </script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========== BARRA SUPERIOR ========== -->
+  <header class="topbar">
+    <a class="logo" href="#inicio">🕹️ LevelUp <span>Arcade</span></a>
+
+    <div class="topbar-der">
+      <span id="estadoRed" class="chip chip-red on"><i class="ic">🟢</i><span class="txt">En línea</span></span>
+      <a id="plazoChip" class="chip chip-plazo oculto" href="#reserva" title="Plazo para confirmar">⏳ <b id="plazoChipTxt">05:00</b></a>
+
+      <button id="btnInstalar" class="btn-icono" aria-label="Instalar aplicación" title="Instalar aplicación">⬇️</button>
+
+      <!-- Hidratación: nace estático y JS lo activa -->
+      <div id="hid-menu" class="grupo-btn estatico" data-hidratado="false">
+        <button id="themeBtn" class="btn-icono" aria-label="Cambiar tema">🌙</button>
+        <button id="burguerBtn" class="btn-icono" aria-label="Menú">⏳</button>
+      </div>
+    </div>
+
+    <nav id="navMenu" class="menu-desplegable">
+      <a href="#inicio"   data-pagina="inicio">🏠 Inicio</a>
+      <a href="#catalogo" data-pagina="catalogo">📚 Catálogo</a>
+      <a href="#reserva"  data-pagina="reserva">🧾 Reserva</a>
+      <a href="#pedidos"  data-pagina="pedidos">🎮 Pedidos</a>
+      <a href="#info"     data-pagina="info">ℹ️ Información</a>
+    </nav>
+  </header>
+
+  <!-- ========== ZONA CENTRAL (sin scroll) ========== -->
+  <main class="stage">
+
+    <!-- ===== INICIO ===== -->
+    <section id="v-inicio" class="vista">
+      <div class="contenedor"><div class="col">
+
+        <div class="hero media img-todos">
+          <span class="emoji">🎮</span>
+          <img src="img/portada.jpg" alt="LevelUp Arcade Bar" width="800" height="500" onerror="this.remove()">
+          <div class="hero-capa"></div>
+          <div class="hero-txt">
+            <span class="pill">🕹️ Ciber Café Gamer</span>
+            <h1>Juega, reserva y sube de nivel</h1>
+            <p>PS5, PC Gamer y Arcade retro. ¿Vienen en grupo? Reserva varias máquinas a la vez.</p>
+            <div class="cta">
+              <a class="btn-main" href="#catalogo">Ver estaciones</a>
+              <a class="btn-ghost btn-claro" href="#reserva">Reservar</a>
+            </div>
+            <ul class="stats">
+              <li><b id="stat-total">0</b><span>Máquinas</span></li>
+              <li><b>18–02h</b><span>Horario</span></li>
+              <li><b id="stat-min">0</b><span>BOB/h desde</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="atajos">
+          <a class="atajo" href="#ps5"><span>🎮</span>PS5</a>
+          <a class="atajo" href="#pc"><span>💻</span>PC</a>
+          <a class="atajo" href="#arcade"><span>👾</span>Arcade</a>
+          <button class="atajo" data-modal="m-pasos"><span>📋</span>Cómo reservar</button>
+        </div>
+
+      </div></div>
+    </section>
+
+    <!-- ===== CATÁLOGO (fetch + paginado) ===== -->
+    <section id="v-catalogo" class="vista">
+      <div class="contenedor"><div class="col">
+
+        <div id="bannerTema" class="banner-tema tema-todos">
+          <span id="bannerIcono" class="banner-ico">📚</span>
+          <div><b id="bannerTitulo">Catálogo completo</b><small id="bannerSub">Todas las estaciones</small></div>
+        </div>
+
+        <div class="tabs">
+          <a class="tab activo" href="#catalogo" data-tab="catalogo">Todos</a>
+          <a class="tab" href="#ps5"    data-tab="ps5">🎮 PS5</a>
+          <a class="tab" href="#pc"     data-tab="pc">💻 PC</a>
+          <a class="tab" href="#arcade" data-tab="arcade">👾 Arcade</a>
+        </div>
+
+        <div id="hint-grupo" class="hint-box">
+          <span>👥 ¿Grupo? Usa <b>− +</b> para ocupar varias máquinas.</span>
+          <button id="hint-close" class="btn-x" aria-label="Cerrar aviso">✕</button>
+        </div>
+        <button id="hint-open" class="btn-ghost btn-sm" style="display:none;">ℹ️ Mostrar ayuda grupal</button>
+
+        <div id="hid-catalogo" class="cat-wrap estatico" data-hidratado="false">
+          <p class="aviso-hid">⏳ Activando catálogo…</p>
+          <section id="catalogoArcade" class="lista-estaciones"></section>
+          <div class="pager">
+            <button id="pgPrev" class="btn-tactil" aria-label="Anterior">‹</button>
+            <span id="pgInfo">Página 1 / 1</span>
+            <button id="pgNext" class="btn-tactil" aria-label="Siguiente">›</button>
+          </div>
+        </div>
+
+      </div></div>
+    </section>
+
+    <!-- ===== RESERVA ===== -->
+    <section id="v-reserva" class="vista">
+      <div class="contenedor">
+        <div id="hid-reserva" class="reserva-col estatico" data-hidratado="false">
+          <p class="aviso-hid">⏳ Activando reserva…</p>
+
+          <section class="box resumen">
+            <h2>🧾 Resumen</h2>
+            <div id="holdBox" class="hold-box oculto">
+              <div class="hold-row"><span>⏳ Plazo para confirmar</span><strong id="holdTimer">05:00</strong></div>
+              <div class="barra"><div id="holdFill"></div></div>
+            </div>
+            <ul id="resumenLineas" class="lineas"></ul>
+            <div class="total-row"><span>Total</span><strong id="total-price">0 BOB</strong></div>
+          </section>
+
+          <div class="acciones-res">
+            <div class="tiles">
+              <button class="tile" data-modal="m-calc"><span class="t-ico">⏱️</span><b>Horas y tarifa</b><small id="tileCalc">1 h · Normal</small></button>
+              <button class="tile" data-modal="m-combos"><span class="t-ico">🍔</span><b>Combos</b><small id="tileCombos">Ninguno</small></button>
+              <button class="tile" id="tileDatosBtn"><span class="t-ico">👤</span><b>Mis datos</b><small id="tileDatos">Pendiente</small></button>
+              <button class="tile" data-modal="m-pedido"><span class="t-ico">📄</span><b>Ver detalle</b><small id="tilePedido">0 ítems</small></button>
+            </div>
+            <button id="btn-confirm" class="btn-main">Confirmar Reserva</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PEDIDOS ===== -->
+    <section id="v-pedidos" class="vista">
+      <div class="contenedor">
+        <div id="hid-pedidos" class="pedidos-col estatico" data-hidratado="false">
+          <p class="aviso-hid">⏳ Activando pedidos…</p>
+          <button class="tile tile-grande" data-modal="m-reservas">
+            <span class="t-ico">📋</span><b>Mis reservas</b><small id="tileReservas">0 reservas</small>
+          </button>
+          <button class="tile tile-grande" data-modal="m-juego">
+            <span class="t-ico">🎮</span><b>Pedir juego</b><small id="tileCola">0 en cola</small>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INFORMACIÓN ===== -->
+    <section id="v-info" class="vista">
+      <div class="contenedor"><div class="col">
+
+        <div class="info-grid">
+          <div class="box"><b>🕒 Horario</b><p>Lunes a domingo<br>18:00 – 02:00</p></div>
+          <div class="box"><b>📍 Ubicación</b><p>[Tu dirección], La Paz<br>[Referencia]</p></div>
+          <div class="box"><b>📞 Contacto</b>
+            <p><a href="https://wa.me/591700000000" target="_blank" rel="noopener">WhatsApp: 700 00000</a><br>
+               <a href="mailto:contacto@levelup.com">contacto@levelup.com</a></p></div>
+        </div>
+
+        <button id="btn-datos" class="btn-ghost">🏢 Ver datos formales de la empresa</button>
+
+        <div class="redes">
+          <a href="https://facebook.com/tu-pagina" target="_blank" rel="noopener" aria-label="Facebook">📘</a>
+          <a href="https://instagram.com/tu_usuario" target="_blank" rel="noopener" aria-label="Instagram">📸</a>
+          <a href="https://tiktok.com/@tu_usuario" target="_blank" rel="noopener" aria-label="TikTok">🎵</a>
+          <a href="https://wa.me/591700000000" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
+          <a href="https://youtube.com/@tu_canal" target="_blank" rel="noopener" aria-label="YouTube">▶️</a>
+        </div>
+        <p class="copy">© 2026 LevelUp Arcade Bar • Diseño Web II</p>
+
+      </div></div>
+    </section>
+
+  </main>
+
+  <!-- ========== MENÚ INFERIOR ========== -->
+  <nav class="bottom-nav">
+    <a href="#inicio"   class="nav-item" data-pagina="inicio"><span class="ico">🏠</span><span>Inicio</span></a>
+    <a href="#catalogo" class="nav-item" data-pagina="catalogo"><span class="ico">📚</span><span>Catálogo</span></a>
+    <a href="#reserva"  class="nav-item" data-pagina="reserva"><span class="ico">🧾</span><span>Reserva</span><i id="navBadge" class="badge-nav oculto">0</i></a>
+    <a href="#pedidos"  class="nav-item" data-pagina="pedidos"><span class="ico">🎮</span><span>Pedidos</span></a>
+    <a href="#info"     class="nav-item" data-pagina="info"><span class="ico">ℹ️</span><span>Info</span></a>
+  </nav>
+</div>
+
+<!-- ================= VENTANAS FLOTANTES ================= -->
+
+<!-- Cómo reservar -->
+<div class="pantalla" id="m-pasos"><div class="ventana">
+  <div class="v-head"><h3>📋 ¿Cómo reservar en grupo?</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <ol class="pasos">
+      <li><b>Elige las máquinas</b><small>Usa − + en cada tarjeta. Puedes mezclar zonas.</small></li>
+      <li><b>Define las horas</b><small>Igual para todo el grupo.</small></li>
+      <li><b>Llena tus datos</b><small>Quién reserva y cuántas personas son.</small></li>
+      <li><b>Confirma a tiempo</b><small>Tienes 5 minutos antes de que se libere.</small></li>
+    </ol>
+  </div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<!-- Detalle de una estación -->
+<div class="pantalla" id="m-detalle"><div class="ventana">
+  <div class="v-head"><h3 id="detTitulo">Estación</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <div class="det-top"><span id="detInsignia" class="etq"></span><span id="detStock" class="etq"></span></div>
+    <p id="detPrecio" class="precio"></p>
+    <ul id="detLista" class="lista-det"></ul>
+    <p id="detEnGrupo" class="sub"></p>
+  </div>
+  <div class="v-foot"><button id="detAgregar" class="btn-main">+ Agregar al grupo</button></div>
+</div></div>
+
+<!-- Horas y tarifa -->
+<div class="pantalla" id="m-calc"><div class="ventana">
+  <div class="v-head"><h3>⏱️ Horas y tarifa</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <div class="fila-form">
+      <label for="hrs">Horas</label>
+      <input type="number" id="hrs" value="1" min="1" max="12">
+      <label for="rate">Tarifa</label>
+      <select id="rate">
+        <option value="1">Normal</option>
+        <option value="0.85">⚡ Flash (-15%)</option>
+      </select>
+    </div>
+    <p class="sub">Las horas aplican a todas las máquinas del grupo.</p>
+  </div>
+  <div class="v-foot"><button class="btn-main" data-cerrar>Listo</button></div>
+</div></div>
+
+<!-- Combos -->
+<div class="pantalla" id="m-combos"><div class="ventana">
+  <div class="v-head"><h3>🍔 Combos Gamer</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <div class="combo" data-name="Combo Gamer 1" data-price="20">
+      <div class="combo-txt"><strong>Combo 1</strong><small>Bebida + Papas</small></div><em>20 BOB</em>
+      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
+    </div>
+    <div class="combo" data-name="Combo Gamer 2" data-price="35">
+      <div class="combo-txt"><strong>Combo 2</strong><small>Hamburguesa + Bebida</small></div><em>35 BOB</em>
+      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
+    </div>
+    <div class="combo" data-name="Combo Gamer 3" data-price="50">
+      <div class="combo-txt"><strong>Combo 3</strong><small>Pizza + 2 Bebidas</small></div><em>50 BOB</em>
+      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
+    </div>
+  </div>
+  <div class="v-foot"><button class="btn-main" data-cerrar>Listo</button></div>
+</div></div>
+
+<!-- Datos de quien reserva (3 pasos, sin scroll) -->
+<div class="pantalla" id="m-cliente"><div class="ventana">
+  <div class="v-head"><h3>👤 Datos de quien reserva</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <p id="pasoInfo" class="sub">Paso 1 de 3</p>
+    <form id="formReserva" class="form-grid" novalidate>
+
+      <div id="paso1" class="paso">
+        <div class="campo"><label for="nombre">Nombre completo</label>
+          <input id="nombre" type="text" maxlength="60" placeholder="Ej: Juan Pérez" autocomplete="name"><small class="err"></small></div>
+        <div class="campo"><label for="ci">Cédula de Identidad</label>
+          <input id="ci" type="text" inputmode="numeric" maxlength="9" placeholder="Ej: 8123456"><small class="err"></small></div>
+        <div class="campo"><label for="tel">Celular</label>
+          <input id="tel" type="text" inputmode="numeric" maxlength="8" placeholder="Ej: 71234567" autocomplete="tel"><small class="err"></small></div>
+      </div>
+
+      <div id="paso2" class="paso" style="display:none;">
+        <div class="campo"><label for="email">Correo</label>
+          <input id="email" type="email" placeholder="correo@ejemplo.com" autocomplete="email"><small class="err"></small></div>
+        <div class="campo"><label for="personas">Personas en el grupo</label>
+          <input id="personas" type="number" min="1" max="40" placeholder="Ej: 5"><small class="err"></small></div>
+      </div>
+
+      <div id="paso3" class="paso" style="display:none;">
+        <div class="campo"><label for="fecha">Fecha</label>
+          <input id="fecha" type="date"><small class="err"></small></div>
+        <div class="campo"><label for="hora">Hora de llegada</label>
+          <select id="hora">
+            <option value="">Selecciona…</option>
+            <option>18:00</option><option>19:00</option><option>20:00</option><option>21:00</option>
+            <option>22:00</option><option>23:00</option><option>00:00</option><option>01:00</option>
+          </select><small class="err"></small></div>
+        <div class="campo"><label class="check"><input id="terms" type="checkbox"> Confirmo que mis datos son correctos y acepto las condiciones.</label>
+          <small class="err"></small></div>
+      </div>
+
+    </form>
+  </div>
+  <div class="v-foot">
+    <button id="pasoAtras" class="btn-ghost oculto">‹ Atrás</button>
+    <button id="pasoSig" class="btn-main">Siguiente ›</button>
+  </div>
+</div></div>
+
+<!-- Detalle del pedido -->
+<div class="pantalla" id="m-pedido"><div class="ventana">
+  <div class="v-head"><h3>📄 Detalle del pedido</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <ul id="order-list"></ul>
+    <div class="total-row"><span>Total</span><strong id="total-modal">0 BOB</strong></div>
+  </div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<!-- Mis reservas (anti-XSS) -->
+<div class="pantalla" id="m-reservas"><div class="ventana">
+  <div class="v-head"><h3>📋 Mis reservas</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body"><ul id="listaReservas" class="lista-segura"></ul></div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<!-- Pedir juego (anti-XSS + delegación) -->
+<div class="pantalla" id="m-juego"><div class="ventana">
+  <div class="v-head"><h3>🎮 Pedir juego</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <p class="sub">Dinos qué quieres jugar y lo dejamos listo para tu turno.</p>
+    <div class="fila-pedir">
+      <input type="text" id="inputJuego" maxlength="60" placeholder="Pedir juego o título...">
+      <button id="btnPedir" class="btn-tactil">+ Pedir</button>
+    </div>
+    <div id="listaCola"></div>
+  </div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<!-- Datos formales (.fadeToggle) -->
+<div class="pantalla" id="m-datos"><div class="ventana">
+  <div class="v-head"><h3>🏢 Datos formales</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body datos">
+    <ul>
+      <li><span>Nombre comercial</span><b>LevelUp Arcade Bar</b></li>
+      <li><span>Razón social</span><b>[Completar]</b></li>
+      <li><span>NIT</span><b>[Completar]</b></li>
+      <li><span>Rubro</span><b>Ciber café gamer</b></li>
+      <li><span>Dirección</span><b>[Completar], La Paz</b></li>
+      <li><span>Horario</span><b>Lun–Dom, 18:00 a 02:00</b></li>
+    </ul>
+  </div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<!-- Cómo instalar -->
+<div class="pantalla" id="m-instalar"><div class="ventana">
+  <div class="v-head"><h3>⬇️ Instalar la app</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <p class="sub">Tu navegador no mostró el instalador automático. Hazlo manualmente:</p>
+    <ul class="lista-det">
+      <li><b>Android (Chrome):</b> menú ⋮ → <i>Instalar aplicación</i> o <i>Agregar a pantalla de inicio</i>.</li>
+      <li><b>iPhone (Safari):</b> botón Compartir → <i>Agregar a inicio</i>.</li>
+      <li><b>PC (Chrome / Edge):</b> ícono ⊕ al final de la barra de direcciones.</li>
+    </ul>
+    <p class="sub">La instalación solo está disponible en HTTPS (GitHub Pages) o en localhost.</p>
+  </div>
+  <div class="v-foot"><button class="btn-ghost" data-cerrar>Entendido</button></div>
+</div></div>
+
+<!-- Confirmar reserva (30 s) -->
+<div class="pantalla" id="m-confirm"><div class="ventana">
+  <div class="v-head"><h3>Confirmar Reserva — LevelUp</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-body">
+    <p class="sub">Verifique el detalle de su transacción antes de procesar el registro:</p>
+    <ul class="modal-det">
+      <li><span>Cliente</span><strong id="m-client">—</strong></li>
+      <li><span>Grupo</span><strong id="m-group">—</strong></li>
+      <li><span>Fecha y hora</span><strong id="m-when">—</strong></li>
+      <li><span>Servicio</span><strong id="m-service">—</strong></li>
+      <li><span>Monto a Cancelar</span><strong id="m-amount">—</strong></li>
+      <li><span>Tiempo Restante</span><strong id="m-timer">00:30</strong></li>
+    </ul>
+    <div class="barra"><div id="timerFill"></div></div>
+  </div>
+  <div class="v-foot">
+    <button class="btn-ghost" data-cerrar>Cancelar</button>
+    <button id="m-pay" class="btn-main">Procesar Pago</button>
+  </div>
+</div></div>
+
+<div id="toast-box"></div>
+
+</body>
+</html>

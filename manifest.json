@@ -1,0 +1,16 @@
+{
+  "short_name": "LevelUp",
+  "name": "LevelUp Arcade Bar - Ciber Café Gamer",
+  "description": "Reserva estaciones PS5, PC Gamer y Arcade en grupo. Funciona sin conexión.",
+  "icons": [
+    { "src": "icons/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icons/icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "start_url": "./index.html",
+  "scope": "./",
+  "background_color": "#0b0b1a",
+  "theme_color": "#0b0b1a",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "es"
+}
