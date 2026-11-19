@@ -17,13 +17,6 @@
   <script src="script.js" defer></script>
 
   <script>
-    // Captura temprana del evento de instalación (puede dispararse antes de que cargue script.js)
-    window.__instalar = null;
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
-      window.__instalar = e;
-    });
-
     // Registro del Service Worker (soporte offline)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
@@ -36,17 +29,18 @@
 </head>
 <body>
 
+<!-- Fondo desenfocado: carrusel de img/fondo-1.jpg, fondo-2.jpg y fondo-3.jpg -->
+<div class="fondo-pc" aria-hidden="true"></div>
+
 <div class="app">
 
   <!-- ========== BARRA SUPERIOR ========== -->
   <header class="topbar">
-    <a class="logo" href="#inicio">🕹️ LevelUp <span>Arcade</span></a>
+    <a class="logo" href="#inicio">🕹️ Punto <span>Gamer</span></a>
 
     <div class="topbar-der">
       <span id="estadoRed" class="chip chip-red on"><i class="ic">🟢</i><span class="txt">En línea</span></span>
       <a id="plazoChip" class="chip chip-plazo oculto" href="#reserva" title="Plazo para confirmar">⏳ <b id="plazoChipTxt">05:00</b></a>
-
-      <button id="btnInstalar" class="btn-icono" aria-label="Instalar aplicación" title="Instalar aplicación">⬇️</button>
 
       <!-- Hidratación: nace estático y JS lo activa -->
       <div id="hid-menu" class="grupo-btn estatico" data-hidratado="false">
@@ -59,7 +53,7 @@
       <a href="#inicio"   data-pagina="inicio">🏠 Inicio</a>
       <a href="#catalogo" data-pagina="catalogo">📚 Catálogo</a>
       <a href="#reserva"  data-pagina="reserva">🧾 Reserva</a>
-      <a href="#pedidos"  data-pagina="pedidos">🎮 Pedidos</a>
+      <a href="#pedidos"  data-pagina="pedidos">📋 Historial</a>
       <a href="#info"     data-pagina="info">ℹ️ Información</a>
     </nav>
   </header>
@@ -69,74 +63,117 @@
 
     <!-- ===== INICIO ===== -->
     <section id="v-inicio" class="vista">
-      <div class="contenedor"><div class="col">
+      <div class="contenedor"><div class="col lado-layout">
 
-        <div class="hero media img-todos">
-          <span class="emoji">🎮</span>
-          <img src="img/portada.jpg" alt="LevelUp Arcade Bar" width="800" height="500" onerror="this.remove()">
-          <div class="hero-capa"></div>
-          <div class="hero-txt">
-            <span class="pill">🕹️ Ciber Café Gamer</span>
-            <h1>Juega, reserva y sube de nivel</h1>
-            <p>PS5, PC Gamer y Arcade retro. ¿Vienen en grupo? Reserva varias máquinas a la vez.</p>
-            <div class="cta">
-              <a class="btn-main" href="#catalogo">Ver estaciones</a>
-              <a class="btn-ghost btn-claro" href="#reserva">Reservar</a>
+        <div class="lado-main">
+          <div class="hero media img-todos">
+            <span class="emoji">🎮</span>
+            <video autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+              <source src="img/video-inicio.mp4" type="video/mp4">
+            </video>
+            <div class="hero-capa"></div>
+            <div class="hero-txt">
+              <span class="pill">🕹️ Ciber Café Gamer</span>
+              <h1>Juega, reserva y sube de nivel</h1>
+              <p>PS5, PC Gamer y Arcade retro. ¿Vienen en grupo? Reserva varias máquinas a la vez.</p>
+              <div class="cta">
+                <a class="btn-main" href="#catalogo">Ver estaciones</a>
+                <a class="btn-ghost btn-claro" href="#reserva">Reservar</a>
+              </div>
+              <ul class="stats">
+                <li><b id="stat-total">0</b><span>Máquinas</span></li>
+                <li><b>18–02h</b><span>Horario</span></li>
+                <li><b id="stat-min">0</b><span>BOB/h desde</span></li>
+              </ul>
             </div>
-            <ul class="stats">
-              <li><b id="stat-total">0</b><span>Máquinas</span></li>
-              <li><b>18–02h</b><span>Horario</span></li>
-              <li><b id="stat-min">0</b><span>BOB/h desde</span></li>
-            </ul>
+          </div>
+
+          <div class="atajos">
+            <a class="atajo" href="#ps5"><span>🎮</span>PS5</a>
+            <a class="atajo" href="#pc"><span>💻</span>PC</a>
+            <a class="atajo" href="#arcade"><span>👾</span>Arcade</a>
+            <a class="atajo" href="#snacks"><span>🍔</span>Snacks</a>
+            <button class="atajo" data-modal="m-pasos"><span>📋</span>Ayuda</button>
           </div>
         </div>
 
-        <div class="atajos">
-          <a class="atajo" href="#ps5"><span>🎮</span>PS5</a>
-          <a class="atajo" href="#pc"><span>💻</span>PC</a>
-          <a class="atajo" href="#arcade"><span>👾</span>Arcade</a>
-          <button class="atajo" data-modal="m-pasos"><span>📋</span>Cómo reservar</button>
-        </div>
+        <!-- Panel lateral: solo en pantallas grandes -->
+        <aside class="lado lado-inicio">
+          <div class="box lado-box">
+            <b>🕒 Horario</b>
+            <p id="estadoAbierto" class="estado-abierto">…</p>
+            <small class="sub">Lunes a domingo · 18:00 a 02:00</small>
+          </div>
+          <div class="box lado-box flash-promo">
+            <b>⚡ Tarifa Flash −15 %</b>
+            <p>Elige tus máquinas y confirma en los primeros 3 minutos: el descuento se aplica solo.</p>
+          </div>
+          <div id="hid-lado" class="box lado-box estatico" data-hidratado="false">
+            <b>🔥 Populares</b>
+            <ul id="listaPopulares" class="pop-lista"></ul>
+          </div>
+        </aside>
 
       </div></div>
     </section>
 
-    <!-- ===== CATÁLOGO (fetch + paginado) ===== -->
+    <!-- ===== CATÁLOGO (array + paginado) ===== -->
     <section id="v-catalogo" class="vista">
-      <div class="contenedor"><div class="col">
+      <div class="contenedor"><div class="col lado-layout">
 
-        <div id="bannerTema" class="banner-tema tema-todos">
-          <span id="bannerIcono" class="banner-ico">📚</span>
-          <div><b id="bannerTitulo">Catálogo completo</b><small id="bannerSub">Todas las estaciones</small></div>
-        </div>
+        <div class="lado-main">
+          <div id="bannerTema" class="banner-tema tema-todos">
+            <span id="bannerIcono" class="banner-ico">📚</span>
+            <div><b id="bannerTitulo">Catálogo completo</b><small id="bannerSub">Máquinas y snacks</small></div>
+          </div>
 
-        <div class="tabs">
-          <a class="tab activo" href="#catalogo" data-tab="catalogo">Todos</a>
-          <a class="tab" href="#ps5"    data-tab="ps5">🎮 PS5</a>
-          <a class="tab" href="#pc"     data-tab="pc">💻 PC</a>
-          <a class="tab" href="#arcade" data-tab="arcade">👾 Arcade</a>
-        </div>
+          <div class="tabs">
+            <a class="tab activo" href="#catalogo" data-tab="catalogo">Todos</a>
+            <a class="tab" href="#ps5"    data-tab="ps5">🎮 PS5</a>
+            <a class="tab" href="#pc"     data-tab="pc">💻 PC</a>
+            <a class="tab" href="#arcade" data-tab="arcade">👾 Arcade</a>
+            <a class="tab" href="#snacks" data-tab="snacks">🍔 Snacks</a>
+          </div>
 
-        <div id="hint-grupo" class="hint-box">
-          <span>👥 ¿Grupo? Usa <b>− +</b> para ocupar varias máquinas.</span>
-          <button id="hint-close" class="btn-x" aria-label="Cerrar aviso">✕</button>
-        </div>
-        <button id="hint-open" class="btn-ghost btn-sm" style="display:none;">ℹ️ Mostrar ayuda grupal</button>
+          <div id="hint-grupo" class="hint-box">
+            <span>👥 ¿Grupo? Usa <b>− +</b> para agregar máquinas y snacks.</span>
+            <button id="hint-close" class="btn-x" aria-label="Cerrar aviso">✕</button>
+          </div>
+          <button id="hint-open" class="btn-ghost btn-sm" style="display:none;">ℹ️ Mostrar ayuda grupal</button>
 
-        <div id="hid-catalogo" class="cat-wrap estatico" data-hidratado="false">
-          <p class="aviso-hid">⏳ Activando catálogo…</p>
-          <section id="catalogoArcade" class="lista-estaciones"></section>
-          <div class="pager">
-            <button id="pgPrev" class="btn-tactil" aria-label="Anterior">‹</button>
-            <span id="pgInfo">Página 1 / 1</span>
-            <button id="pgNext" class="btn-tactil" aria-label="Siguiente">›</button>
+          <div id="hid-catalogo" class="cat-wrap estatico" data-hidratado="false">
+            <p class="aviso-hid">⏳ Activando catálogo…</p>
+            <section id="catalogoArcade" class="lista-estaciones"></section>
+            <div class="pager">
+              <button id="pgPrev" class="btn-tactil" aria-label="Anterior">‹</button>
+              <span id="pgInfo">Página 1 / 1</span>
+              <button id="pgNext" class="btn-tactil" aria-label="Siguiente">›</button>
+            </div>
           </div>
         </div>
+
+        <!-- Panel lateral: mini resumen de la reserva (solo pantallas grandes) -->
+        <aside class="lado lado-cat">
+          <div class="box lado-box">
+            <h2>🧾 Tu reserva</h2>
+            <ul class="mini-lista">
+              <li><span>🎮 Máquinas</span><b id="miniMaq">0</b></li>
+              <li><span>🍔 Snacks</span><b id="miniSnk">0</b></li>
+              <li class="mini-total"><span>Total</span><b id="miniTotal">0 BOB</b></li>
+            </ul>
+            <p id="miniFlash" class="mini-flash oculto">⚡ Flash −15 % por <b id="miniFlashT">03:00</b></p>
+            <a class="btn-main" href="#reserva">Ir a Reserva</a>
+          </div>
+          <div class="box lado-box">
+            <b>💡 Tip</b>
+            <p>Mezcla zonas: una PS5 para el grupo y PCs para los que quieran competir. Los snacks se agregan igual, con − +.</p>
+          </div>
+        </aside>
 
       </div></div>
     </section>
 
-    <!-- ===== RESERVA ===== -->
+    <!-- ===== RESERVA (Resumen editable) ===== -->
     <section id="v-reserva" class="vista">
       <div class="contenedor">
         <div id="hid-reserva" class="reserva-col estatico" data-hidratado="false">
@@ -144,40 +181,57 @@
 
           <section class="box resumen">
             <h2>🧾 Resumen</h2>
+
             <div id="holdBox" class="hold-box oculto">
               <div class="hold-row"><span>⏳ Plazo para confirmar</span><strong id="holdTimer">05:00</strong></div>
               <div class="barra"><div id="holdFill"></div></div>
+              <div id="flashRow" class="hold-row flash-row oculto"><span>⚡ Descuento Flash −15 %</span><strong id="flashTimer">03:00</strong></div>
             </div>
-            <ul id="resumenLineas" class="lineas"></ul>
+
+            <div class="horas-row">
+              <span>⏱️ Horas de juego</span>
+              <div class="contador">
+                <button id="h-menos" aria-label="Menos horas">−</button>
+                <span id="horasVal" class="qty">1 hora</span>
+                <button id="h-mas" aria-label="Más horas">+</button>
+              </div>
+            </div>
+
+            <h4 class="sec-titulo">🎮 Máquinas</h4>
+            <ul id="listaMaquinas" class="fila-lista"></ul>
+
+            <h4 class="sec-titulo">🍔 Snacks</h4>
+            <ul id="listaSnacks" class="fila-lista"></ul>
+
+            <div id="descLinea" class="desc-linea oculto"><span>⚡ Descuento Flash −15 %</span><b id="descVal">−0 BOB</b></div>
             <div class="total-row"><span>Total</span><strong id="total-price">0 BOB</strong></div>
           </section>
 
           <div class="acciones-res">
-            <div class="tiles">
-              <button class="tile" data-modal="m-calc"><span class="t-ico">⏱️</span><b>Horas y tarifa</b><small id="tileCalc">1 h · Normal</small></button>
-              <button class="tile" data-modal="m-combos"><span class="t-ico">🍔</span><b>Combos</b><small id="tileCombos">Ninguno</small></button>
-              <button class="tile" id="tileDatosBtn"><span class="t-ico">👤</span><b>Mis datos</b><small id="tileDatos">Pendiente</small></button>
-              <button class="tile" data-modal="m-pedido"><span class="t-ico">📄</span><b>Ver detalle</b><small id="tilePedido">0 ítems</small></button>
-            </div>
+            <button class="tile tile-datos" id="tileDatosBtn"><span class="t-ico">👤</span><b>Mis datos</b><small id="tileDatos">Pendiente</small></button>
             <button id="btn-confirm" class="btn-main">Confirmar Reserva</button>
+
+            <div class="box ayuda-res">
+              <b>💡 Antes de confirmar</b>
+              <ul>
+                <li>Confirma en los primeros 3 minutos y obtén −15 % en las máquinas.</li>
+                <li>Puedes cambiar cantidades y horas directo en el Resumen.</li>
+                <li>Cancela cuando quieras desde el Historial.</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ===== PEDIDOS ===== -->
+    <!-- ===== HISTORIAL (Mis reservas) ===== -->
     <section id="v-pedidos" class="vista">
-      <div class="contenedor">
-        <div id="hid-pedidos" class="pedidos-col estatico" data-hidratado="false">
-          <p class="aviso-hid">⏳ Activando pedidos…</p>
-          <button class="tile tile-grande" data-modal="m-reservas">
-            <span class="t-ico">📋</span><b>Mis reservas</b><small id="tileReservas">0 reservas</small>
-          </button>
-          <button class="tile tile-grande" data-modal="m-juego">
-            <span class="t-ico">🎮</span><b>Pedir juego</b><small id="tileCola">0 en cola</small>
-          </button>
+      <div class="contenedor"><div class="col">
+        <div class="box">
+          <h2>📋 Mis reservas</h2>
+          <ul id="listaReservas" class="lista-segura"></ul>
         </div>
-      </div>
+      </div></div>
     </section>
 
     <!-- ===== INFORMACIÓN ===== -->
@@ -186,22 +240,48 @@
 
         <div class="info-grid">
           <div class="box"><b>🕒 Horario</b><p>Lunes a domingo<br>18:00 – 02:00</p></div>
-          <div class="box"><b>📍 Ubicación</b><p>[Tu dirección], La Paz<br>[Referencia]</p></div>
+          <div class="box"><b>📍 Ubicación</b><p>La Paz<br>[Referencia]</p></div>
           <div class="box"><b>📞 Contacto</b>
-            <p><a href="https://wa.me/591700000000" target="_blank" rel="noopener">WhatsApp: 700 00000</a><br>
-               <a href="mailto:contacto@levelup.com">contacto@levelup.com</a></p></div>
+            <p><a href="https://wa.me/59175341964" target="_blank" rel="noopener">WhatsApp</a><br>
+               <a href="marcelocarvajal@gmail.com">contacto@PuntoGamer.com</a></p></div>
         </div>
 
         <button id="btn-datos" class="btn-ghost">🏢 Ver datos formales de la empresa</button>
 
         <div class="redes">
-          <a href="https://facebook.com/tu-pagina" target="_blank" rel="noopener" aria-label="Facebook">📘</a>
-          <a href="https://instagram.com/tu_usuario" target="_blank" rel="noopener" aria-label="Instagram">📸</a>
-          <a href="https://tiktok.com/@tu_usuario" target="_blank" rel="noopener" aria-label="TikTok">🎵</a>
-          <a href="https://wa.me/591700000000" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
-          <a href="https://youtube.com/@tu_canal" target="_blank" rel="noopener" aria-label="YouTube">▶️</a>
+          <a class="red fb" href="https://facebook.com/tu-pagina" target="_blank" rel="noopener" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-8h2.7l.4-3.2h-3.1V7.8c0-.9.3-1.5 1.6-1.5h1.7V3.4c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.4H7.7V13h2.7v8h3.1z"/></svg>
+            <span>Facebook</span>
+          </a>
+          <a class="red ig" href="https://instagram.com/tu_usuario" target="_blank" rel="noopener" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="currentColor"/></svg>
+            <span>Instagram</span>
+          </a>
+          <a class="red tt" href="https://tiktok.com/@tu_usuario" target="_blank" rel="noopener" aria-label="TikTok">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3v10a3.6 3.6 0 1 1-3.6-3.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M15 3c.3 2.3 1.8 3.9 4.2 4.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <span>TikTok</span>
+          </a>
+          </a>
         </div>
-        <p class="copy">© 2026 LevelUp Arcade Bar • Diseño Web II</p>
+
+        <!-- Preguntas frecuentes: solo en pantallas medianas y grandes -->
+        <div class="box faq">
+          <h2>❓ Preguntas frecuentes</h2>
+          <details>
+            <summary>¿Puedo cancelar mi reserva?</summary>
+            <p>Sí. Entra a Historial y toca Cancelar en la reserva que quieras.</p>
+          </details>
+          <details>
+            <summary>¿Cómo funciona la tarifa Flash?</summary>
+            <p>Si confirmas dentro de los primeros 3 minutos desde que eliges tu primera máquina, tienes −15 % en las máquinas.</p>
+          </details>
+          <details>
+            <summary>¿Puedo pedir snacks sin reservar una máquina?</summary>
+            <p>Los snacks van junto con una reserva: agrégalos desde la pestaña Snacks del Catálogo.</p>
+          </details>
+        </div>
+
+        <p class="copy">© 2026 Punto Gamer • Todos los derechos reservados</p>
 
       </div></div>
     </section>
@@ -213,7 +293,7 @@
     <a href="#inicio"   class="nav-item" data-pagina="inicio"><span class="ico">🏠</span><span>Inicio</span></a>
     <a href="#catalogo" class="nav-item" data-pagina="catalogo"><span class="ico">📚</span><span>Catálogo</span></a>
     <a href="#reserva"  class="nav-item" data-pagina="reserva"><span class="ico">🧾</span><span>Reserva</span><i id="navBadge" class="badge-nav oculto">0</i></a>
-    <a href="#pedidos"  class="nav-item" data-pagina="pedidos"><span class="ico">🎮</span><span>Pedidos</span></a>
+    <a href="#pedidos"  class="nav-item" data-pagina="pedidos"><span class="ico">📋</span><span>Historial</span></a>
     <a href="#info"     class="nav-item" data-pagina="info"><span class="ico">ℹ️</span><span>Info</span></a>
   </nav>
 </div>
@@ -225,18 +305,18 @@
   <div class="v-head"><h3>📋 ¿Cómo reservar en grupo?</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
   <div class="v-body">
     <ol class="pasos">
-      <li><b>Elige las máquinas</b><small>Usa − + en cada tarjeta. Puedes mezclar zonas.</small></li>
-      <li><b>Define las horas</b><small>Igual para todo el grupo.</small></li>
-      <li><b>Llena tus datos</b><small>Quién reserva y cuántas personas son.</small></li>
-      <li><b>Confirma a tiempo</b><small>Tienes 5 minutos antes de que se libere.</small></li>
+      <li><b>Elige máquinas y snacks</b><small>Usa − + en cada tarjeta del Catálogo. Puedes mezclar zonas.</small></li>
+      <li><b>Ajusta tu reserva</b><small>En Reserva cambias cantidades y horas con − +.</small></li>
+      <li><b>Llena tus datos</b><small>Quién reserva y cuándo llega.</small></li>
+      <li><b>Confirma rápido</b><small>Tienes 5 minutos. En los primeros 3 tienes −15 % Flash.</small></li>
     </ol>
   </div>
   <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
 </div></div>
 
-<!-- Detalle de una estación -->
+<!-- Detalle de una estación o snack -->
 <div class="pantalla" id="m-detalle"><div class="ventana">
-  <div class="v-head"><h3 id="detTitulo">Estación</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-head"><h3 id="detTitulo">Detalle</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
   <div class="v-body">
     <div class="det-top"><span id="detInsignia" class="etq"></span><span id="detStock" class="etq"></span></div>
     <p id="detPrecio" class="precio"></p>
@@ -244,44 +324,6 @@
     <p id="detEnGrupo" class="sub"></p>
   </div>
   <div class="v-foot"><button id="detAgregar" class="btn-main">+ Agregar al grupo</button></div>
-</div></div>
-
-<!-- Horas y tarifa -->
-<div class="pantalla" id="m-calc"><div class="ventana">
-  <div class="v-head"><h3>⏱️ Horas y tarifa</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
-  <div class="v-body">
-    <div class="fila-form">
-      <label for="hrs">Horas</label>
-      <input type="number" id="hrs" value="1" min="1" max="12">
-      <label for="rate">Tarifa</label>
-      <select id="rate">
-        <option value="1">Normal</option>
-        <option value="0.85">⚡ Flash (-15%)</option>
-      </select>
-    </div>
-    <p class="sub">Las horas aplican a todas las máquinas del grupo.</p>
-  </div>
-  <div class="v-foot"><button class="btn-main" data-cerrar>Listo</button></div>
-</div></div>
-
-<!-- Combos -->
-<div class="pantalla" id="m-combos"><div class="ventana">
-  <div class="v-head"><h3>🍔 Combos Gamer</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
-  <div class="v-body">
-    <div class="combo" data-name="Combo Gamer 1" data-price="20">
-      <div class="combo-txt"><strong>Combo 1</strong><small>Bebida + Papas</small></div><em>20 BOB</em>
-      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
-    </div>
-    <div class="combo" data-name="Combo Gamer 2" data-price="35">
-      <div class="combo-txt"><strong>Combo 2</strong><small>Hamburguesa + Bebida</small></div><em>35 BOB</em>
-      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
-    </div>
-    <div class="combo" data-name="Combo Gamer 3" data-price="50">
-      <div class="combo-txt"><strong>Combo 3</strong><small>Pizza + 2 Bebidas</small></div><em>50 BOB</em>
-      <div class="contador"><button class="c-menos">−</button><span class="qty">0</span><button class="c-mas">+</button></div>
-    </div>
-  </div>
-  <div class="v-foot"><button class="btn-main" data-cerrar>Listo</button></div>
 </div></div>
 
 <!-- Datos de quien reserva (3 pasos, sin scroll) -->
@@ -301,13 +343,6 @@
       </div>
 
       <div id="paso2" class="paso" style="display:none;">
-        <div class="campo"><label for="email">Correo</label>
-          <input id="email" type="email" placeholder="correo@ejemplo.com" autocomplete="email"><small class="err"></small></div>
-        <div class="campo"><label for="personas">Personas en el grupo</label>
-          <input id="personas" type="number" min="1" max="40" placeholder="Ej: 5"><small class="err"></small></div>
-      </div>
-
-      <div id="paso3" class="paso" style="display:none;">
         <div class="campo"><label for="fecha">Fecha</label>
           <input id="fecha" type="date"><small class="err"></small></div>
         <div class="campo"><label for="hora">Hora de llegada</label>
@@ -316,6 +351,11 @@
             <option>18:00</option><option>19:00</option><option>20:00</option><option>21:00</option>
             <option>22:00</option><option>23:00</option><option>00:00</option><option>01:00</option>
           </select><small class="err"></small></div>
+      </div>
+
+      <div id="paso3" class="paso" style="display:none;">
+        <div class="campo"><label for="email">Correo</label>
+          <input id="email" type="email" placeholder="correo@ejemplo.com" autocomplete="email"><small class="err"></small></div>
         <div class="campo"><label class="check"><input id="terms" type="checkbox"> Confirmo que mis datos son correctos y acepto las condiciones.</label>
           <small class="err"></small></div>
       </div>
@@ -328,35 +368,17 @@
   </div>
 </div></div>
 
-<!-- Detalle del pedido -->
-<div class="pantalla" id="m-pedido"><div class="ventana">
-  <div class="v-head"><h3>📄 Detalle del pedido</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+<!-- Cancelar una reserva -->
+<div class="pantalla" id="m-cancelar"><div class="ventana">
+  <div class="v-head"><h3>🚫 Cancelar reserva</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
   <div class="v-body">
-    <ul id="order-list"></ul>
-    <div class="total-row"><span>Total</span><strong id="total-modal">0 BOB</strong></div>
+    <p id="cancelTexto">¿Cancelar esta reserva?</p>
+    <p class="sub">Esta acción no se puede deshacer.</p>
   </div>
-  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
-</div></div>
-
-<!-- Mis reservas (anti-XSS) -->
-<div class="pantalla" id="m-reservas"><div class="ventana">
-  <div class="v-head"><h3>📋 Mis reservas</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
-  <div class="v-body"><ul id="listaReservas" class="lista-segura"></ul></div>
-  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
-</div></div>
-
-<!-- Pedir juego (anti-XSS + delegación) -->
-<div class="pantalla" id="m-juego"><div class="ventana">
-  <div class="v-head"><h3>🎮 Pedir juego</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
-  <div class="v-body">
-    <p class="sub">Dinos qué quieres jugar y lo dejamos listo para tu turno.</p>
-    <div class="fila-pedir">
-      <input type="text" id="inputJuego" maxlength="60" placeholder="Pedir juego o título...">
-      <button id="btnPedir" class="btn-tactil">+ Pedir</button>
-    </div>
-    <div id="listaCola"></div>
+  <div class="v-foot">
+    <button class="btn-ghost" data-cerrar>No, volver</button>
+    <button id="btnSiCancelar" class="btn-main">Sí, cancelar</button>
   </div>
-  <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
 </div></div>
 
 <!-- Datos formales (.fadeToggle) -->
@@ -364,40 +386,25 @@
   <div class="v-head"><h3>🏢 Datos formales</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
   <div class="v-body datos">
     <ul>
-      <li><span>Nombre comercial</span><b>LevelUp Arcade Bar</b></li>
+      <li><span>Nombre comercial</span><b>Punto Gamer</b></li>
       <li><span>Razón social</span><b>[Completar]</b></li>
       <li><span>NIT</span><b>[Completar]</b></li>
       <li><span>Rubro</span><b>Ciber café gamer</b></li>
-      <li><span>Dirección</span><b>[Completar], La Paz</b></li>
+      <li><span>Dirección</span><b>La Paz</b></li>
       <li><span>Horario</span><b>Lun–Dom, 18:00 a 02:00</b></li>
     </ul>
   </div>
   <div class="v-foot"><button class="btn-ghost" data-cerrar>Cerrar</button></div>
 </div></div>
 
-<!-- Cómo instalar -->
-<div class="pantalla" id="m-instalar"><div class="ventana">
-  <div class="v-head"><h3>⬇️ Instalar la app</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
-  <div class="v-body">
-    <p class="sub">Tu navegador no mostró el instalador automático. Hazlo manualmente:</p>
-    <ul class="lista-det">
-      <li><b>Android (Chrome):</b> menú ⋮ → <i>Instalar aplicación</i> o <i>Agregar a pantalla de inicio</i>.</li>
-      <li><b>iPhone (Safari):</b> botón Compartir → <i>Agregar a inicio</i>.</li>
-      <li><b>PC (Chrome / Edge):</b> ícono ⊕ al final de la barra de direcciones.</li>
-    </ul>
-    <p class="sub">La instalación solo está disponible en HTTPS (GitHub Pages) o en localhost.</p>
-  </div>
-  <div class="v-foot"><button class="btn-ghost" data-cerrar>Entendido</button></div>
-</div></div>
-
 <!-- Confirmar reserva (30 s) -->
 <div class="pantalla" id="m-confirm"><div class="ventana">
-  <div class="v-head"><h3>Confirmar Reserva — LevelUp</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
+  <div class="v-head"><h3>Confirmar Reserva — Punto Gamer</h3><button class="btn-x" data-cerrar aria-label="Cerrar">✕</button></div>
   <div class="v-body">
     <p class="sub">Verifique el detalle de su transacción antes de procesar el registro:</p>
     <ul class="modal-det">
       <li><span>Cliente</span><strong id="m-client">—</strong></li>
-      <li><span>Grupo</span><strong id="m-group">—</strong></li>
+      <li><span>Reserva</span><strong id="m-group">—</strong></li>
       <li><span>Fecha y hora</span><strong id="m-when">—</strong></li>
       <li><span>Servicio</span><strong id="m-service">—</strong></li>
       <li><span>Monto a Cancelar</span><strong id="m-amount">—</strong></li>

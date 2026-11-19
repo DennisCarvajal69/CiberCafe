@@ -6,34 +6,138 @@ $(document).ready(function () {
   if (window.__arcadeInit) return;
   window.__arcadeInit = true;
 
+  /* Carrusel de fondo para escritorio */
+  const fotosFondo = ['img/fondo1.jpg', 'img/fondo2.jpg', 'img/fondo3.jpg'];
+  const fondo = document.querySelector('.fondo-pc');
+  if (fondo) {
+    Promise.all(fotosFondo.map(function (ruta) {
+      return new Promise(function (resolver) {
+        const imagen = new Image();
+        imagen.onload = function () { resolver(ruta); };
+        imagen.onerror = function () {
+          console.warn('No se pudo cargar la imagen de fondo:', ruta);
+          resolver(null);
+        };
+        imagen.src = ruta;
+      });
+    })).then(function (resultados) {
+      const fotos = resultados.filter(function (ruta) { return ruta !== null; });
+      if (!fotos.length) return;
+
+      const capas = [document.createElement('div'), document.createElement('div')];
+      capas.forEach(function (capa) {
+        capa.className = 'fondo-slide';
+        fondo.appendChild(capa);
+      });
+
+      let indice = 0;
+      let capaActiva = 0;
+      capas[capaActiva].style.backgroundImage = 'url("' + fotos[indice] + '")';
+      capas[capaActiva].classList.add('visible');
+
+      if (fotos.length < 2) return;
+      window.setInterval(function () {
+        const siguiente = 1 - capaActiva;
+        indice = (indice + 1) % fotos.length;
+        capas[siguiente].style.backgroundImage = 'url("' + fotos[indice] + '")';
+        capas[siguiente].classList.add('visible');
+        capas[capaActiva].classList.remove('visible');
+        capaActiva = siguiente;
+      }, 6000);
+    });
+  }
+
   /* ============================================
      CONSTANTES Y ESTADO
      ============================================ */
   const KEY          = 'levelup_pwa_v2';
-  const PLAZO        = 300;   // 5 min para confirmar
-  const TIEMPO_MODAL = 30;    // 30 s del modal de confirmación
-  const VISTAS       = ['inicio', 'catalogo', 'ps5', 'pc', 'arcade', 'reserva', 'pedidos', 'info'];
-  const CATEGORIAS   = ['catalogo', 'ps5', 'pc', 'arcade'];
-  const ETIQUETA     = { ps5: 'PS5', pc: 'PC', arcade: 'Arcade' };
-  const CAMPOS       = ['nombre', 'ci', 'tel', 'email', 'personas', 'fecha', 'hora', 'terms'];
-  const PASOS        = { 1: ['nombre', 'ci', 'tel'], 2: ['email', 'personas'], 3: ['fecha', 'hora', 'terms'] };
+  const PLAZO        = 300;   // 5 min para confirmar la reserva
+  const FLASH        = 180;   // los primeros 3 min del plazo: −15 % (para probar, pon 20)
+  const DESC_FLASH   = 0.15;
+  const TIEMPO_MODAL = 30;    // 30 s de la ventana de confirmación
+  const VISTAS       = ['inicio', 'catalogo', 'ps5', 'pc', 'arcade', 'snacks', 'reserva', 'pedidos', 'info'];
+  const CATEGORIAS   = ['catalogo', 'ps5', 'pc', 'arcade', 'snacks'];
+  const ETIQUETA     = { ps5: 'PS5', pc: 'PC', arcade: 'Arcade', snacks: 'Snack' };
+  const ESTADOS      = { pendiente: '⏳ Guardado localmente · Pendiente', verificada: '✅ Verificada', cancelada: '🚫 Cancelada' };
+  const CAMPOS       = ['nombre', 'ci', 'tel', 'fecha', 'hora', 'email', 'terms'];
+  const PASOS        = { 1: ['nombre', 'ci', 'tel'], 2: ['fecha', 'hora'], 3: ['email', 'terms'] };
   const ALTO_FILA    = 84;    // alto de cada tarjeta del catálogo
+  const ANCHO_MIN    = 270;   // ancho mínimo de una tarjeta
   const GAP          = 8;
 
   const TEMAS = {
-    catalogo: { clase: 'tema-todos',  icono: '📚', titulo: 'Catálogo completo', sub: 'Todas las estaciones' },
+    catalogo: { clase: 'tema-todos',  icono: '📚', titulo: 'Catálogo completo', sub: 'Máquinas y snacks' },
     ps5:      { clase: 'tema-ps5',    icono: '🎮', titulo: 'PlayStation 5',     sub: 'Solo estaciones PS5' },
     pc:       { clase: 'tema-pc',     icono: '💻', titulo: 'PC Gamer',          sub: 'Solo estaciones PC' },
-    arcade:   { clase: 'tema-arcade', icono: '👾', titulo: 'Arcade Retro',      sub: 'Solo máquinas Arcade' }
+    arcade:   { clase: 'tema-arcade', icono: '👾', titulo: 'Arcade Retro',      sub: 'Solo máquinas Arcade' },
+    snacks:   { clase: 'tema-snacks', icono: '🍔', titulo: 'Snacks y bebidas',  sub: 'Pide algo para tu partida' }
   };
 
-  let estaciones    = [];
+  /* ============================================
+     ARRAYS DE DATOS: máquinas (precio por hora) y snacks (precio por unidad)
+     ============================================ */
+  const ESTACIONES = [
+    { id: 'ps5-fifa',   nombre: 'PS5 · Sala FIFA',            tipo: 'ps5',    icono: '⚽',  img: 'ps5-fifa.jpg',        precio: 18, stock: 3, popular: true, det: ['2 controles DualSense', 'TV 55" 4K 120Hz', 'FIFA 24, UFC 5'] },
+    { id: 'ps5-aven',   nombre: 'PS5 · Sala Aventura',        tipo: 'ps5',    icono: '🕷️', img: 'ps5-aventura.jpg',    precio: 18, stock: 3, det: ['Control DualSense', 'TV 50" 4K', 'Spider-Man 2, God of War'] },
+    { id: 'ps5-race',   nombre: 'PS5 · Sala Carreras',        tipo: 'ps5',    icono: '🏎️', img: 'ps5-carreras.jpg',    precio: 20, stock: 2, det: ['Volante con pedales', 'TV 55" 4K', 'Gran Turismo 7, F1 24'] },
+    { id: 'ps5-coop',   nombre: 'PS5 · Sala Cooperativo',     tipo: 'ps5',    icono: '🤝',  img: 'ps5-coop.jpg',        precio: 18, stock: 3, det: ['4 controles DualSense', 'Sofá para grupos', 'It Takes Two, Overcooked'] },
+    { id: 'ps5-fight',  nombre: 'PS5 · Sala Peleas',          tipo: 'ps5',    icono: '🥋',  img: 'ps5-peleas.jpg',      precio: 18, stock: 2, det: ['Arcade stick opcional', 'TV 50" 4K', 'Tekken 8, Mortal Kombat 1'] },
+    { id: 'ps5-vip',    nombre: 'PS5 · Sala VIP',             tipo: 'ps5',    icono: '👑',  img: 'ps5-vip.jpg',         precio: 30, stock: 1, det: ['Sala privada con A/C', 'TV 65" OLED', 'Sofá + mesa de snacks'] },
+    { id: 'ps5-terror', nombre: 'PS5 · Sala Terror',          tipo: 'ps5',    icono: '👻',  img: 'ps5-terror.jpg',      precio: 18, stock: 2, det: ['Ambiente oscuro', 'TV 50" 4K', 'Resident Evil 4, Alan Wake 2'] },
+    { id: 'ps5-fam',    nombre: 'PS5 · Sala Familiar',        tipo: 'ps5',    icono: '👨‍👩‍👧', img: 'ps5-familiar.jpg',    precio: 15, stock: 2, det: ['2 controles', 'TV 50"', 'Crash Team Racing, Sackboy'] },
+
+    { id: 'pc-pro',     nombre: 'PC Gamer · Pro',             tipo: 'pc',     icono: '🎯',  img: 'pc-pro.jpg',          precio: 12, stock: 6, popular: true, det: ['Ryzen 7 + RTX 4060', 'Monitor 144Hz', 'Teclado mecánico'] },
+    { id: 'pc-std',     nombre: 'PC Gamer · Estándar',        tipo: 'pc',     icono: '🔫',  img: 'pc-estandar.jpg',     precio: 8,  stock: 8, det: ['Ryzen 5 + GTX 1660', 'Monitor 75Hz', 'Audífonos gamer'] },
+    { id: 'pc-stream',  nombre: 'PC Gamer · Streaming',       tipo: 'pc',     icono: '🎥',  img: 'pc-streaming.jpg',    precio: 18, stock: 2, det: ['Ryzen 9 + RTX 4070', 'Micrófono y cámara', 'OBS instalado'] },
+    { id: 'pc-moba',    nombre: 'PC Gamer · MOBA / LoL',      tipo: 'pc',     icono: '⚔️', img: 'pc-moba.jpg',         precio: 9,  stock: 5, det: ['Ryzen 5 + RTX 3050', 'Monitor 144Hz', 'League of Legends, Dota 2'] },
+    { id: 'pc-fps',     nombre: 'PC Gamer · FPS Competitivo', tipo: 'pc',     icono: '🎯',  img: 'pc-fps.jpg',          precio: 13, stock: 4, det: ['Monitor 240Hz', 'Mouse ultraligero', 'Valorant, CS2, Apex'] },
+    { id: 'pc-team',    nombre: 'PC Gamer · Zona Equipos',    tipo: 'pc',     icono: '👥',  img: 'pc-equipos.jpg',      precio: 10, stock: 5, det: ['Mesa para 5 jugadores', 'Voz por equipo', 'Ideal para torneos'] },
+    { id: 'pc-br',      nombre: 'PC Gamer · Battle Royale',   tipo: 'pc',     icono: '🪂',  img: 'pc-br.jpg',           precio: 10, stock: 4, det: ['Ryzen 5 + RTX 3060', 'Monitor 165Hz', 'Fortnite, Warzone, Apex'] },
+    { id: 'pc-sim',     nombre: 'PC Gamer · Simulación',      tipo: 'pc',     icono: '🚚',  img: 'pc-sim.jpg',          precio: 12, stock: 2, det: ['Volante con pedales', 'Monitor curvo', 'Euro Truck Simulator 2, Assetto Corsa'] },
+    { id: 'pc-indie',   nombre: 'PC Gamer · Indie y Retro',   tipo: 'pc',     icono: '🕹️', img: 'pc-indie.jpg',        precio: 7,  stock: 4, det: ['Ryzen 3 + GTX 1650', 'Control incluido', 'Stardew Valley, Hollow Knight, Terraria'] },
+
+    { id: 'arc-sf',     nombre: 'Arcade · Street Fighter',    tipo: 'arcade', icono: '🥊',  img: 'arcade-sf.jpg',       precio: 5,  stock: 2, popular: true, det: ['500+ juegos clásicos', '2 jugadores', 'Joysticks originales'] },
+    { id: 'arc-pac',    nombre: 'Arcade · Pac-Man',           tipo: 'arcade', icono: '🟡',  img: 'arcade-pacman.jpg',   precio: 5,  stock: 2, det: ['Máquina vintage', '1–2 jugadores', 'Ranking de puntajes'] },
+    { id: 'arc-moto',   nombre: 'Arcade · Motos y Carreras',  tipo: 'arcade', icono: '🏍️', img: 'arcade-motos.jpg',    precio: 6,  stock: 2, det: ['Asiento simulador', 'Pantalla 42"', 'Daytona USA'] },
+    { id: 'arc-dance',  nombre: 'Arcade · Baile',             tipo: 'arcade', icono: '💃',  img: 'arcade-baile.jpg',    precio: 6,  stock: 1, det: ['Plataforma de baile', '2 jugadores', 'Dance Dance Revolution'] },
+    { id: 'arc-air',    nombre: 'Arcade · Air Hockey',        tipo: 'arcade', icono: '🏒',  img: 'arcade-airhockey.jpg', precio: 4, stock: 2, det: ['Mesa profesional', '1 vs 1', 'Marcador digital'] },
+    { id: 'arc-bask',   nombre: 'Arcade · Basketball',        tipo: 'arcade', icono: '🏀',  img: 'arcade-basket.jpg',   precio: 4,  stock: 2, det: ['Aros con marcador', 'Competencia de tiros', 'Ranking diario'] },
+    { id: 'arc-claw',   nombre: 'Arcade · Peluches',          tipo: 'arcade', icono: '🧸',  img: 'arcade-peluches.jpg', precio: 3,  stock: 2, det: ['Máquina de garra', 'Premios variados', 'Para todas las edades'] },
+    { id: 'arc-shoot',  nombre: 'Arcade · Pistolas',          tipo: 'arcade', icono: '🔫',  img: 'arcade-pistolas.jpg', precio: 6,  stock: 1, det: ['2 pistolas de luz', 'Modo cooperativo', 'House of the Dead'] },
+    { id: 'arc-pin',    nombre: 'Arcade · Pinball',           tipo: 'arcade', icono: '🎰',  img: 'arcade-pinball.jpg',  precio: 5,  stock: 2, det: ['Mesa clásica', '1–4 jugadores', 'Ranking de puntajes'] },
+    { id: 'arc-meteg',  nombre: 'Arcade · Metegol',           tipo: 'arcade', icono: '⚽',  img: 'arcade-metegol.jpg',  precio: 4,  stock: 2, det: ['Mesa profesional', '2 vs 2', 'Marcador manual'] },
+    { id: 'arc-ritmo',  nombre: 'Arcade · Ritmo',             tipo: 'arcade', icono: '🥁',  img: 'arcade-ritmo.jpg',    precio: 6,  stock: 1, det: ['Guitarra y batería', '2 jugadores', 'Canciones clásicas'] }
+  ];
+
+  const SNACKS = [
+    { id: 'sn-c1',      nombre: 'Combo Gamer 1',  tipo: 'snacks', icono: '🍟', img: 'snack-combo1.jpg',  precio: 14, stock: 15, det: ['Bebida 500 ml', 'Papas fritas'] },
+    { id: 'sn-c2',      nombre: 'Combo Gamer 2',  tipo: 'snacks', icono: '🍔', img: 'snack-combo2.jpg',  precio: 22, stock: 15, popular: true, det: ['Hamburguesa', 'Bebida 500 ml'] },
+    { id: 'sn-c3',      nombre: 'Combo Gamer 3',  tipo: 'snacks', icono: '🍕', img: 'snack-combo3.jpg',  precio: 32, stock: 15, det: ['Pizza personal', '2 bebidas 500 ml'] },
+    { id: 'sn-burger',  nombre: 'Hamburguesa',    tipo: 'snacks', icono: '🍔', img: 'snack-burger.jpg',  precio: 15, stock: 20, det: ['Carne, queso y lechuga', 'Papas aparte'] },
+    { id: 'sn-salchi',  nombre: 'Salchipapa',     tipo: 'snacks', icono: '🌭', img: 'snack-salchi.jpg',  precio: 14, stock: 20, det: ['Salchicha y papas', 'Con salsas'] },
+    { id: 'sn-pizza',   nombre: 'Pizza personal', tipo: 'snacks', icono: '🍕', img: 'snack-pizza.jpg',   precio: 18, stock: 20, det: ['Queso y jamón', '6 porciones'] },
+    { id: 'sn-papas',   nombre: 'Papas fritas',   tipo: 'snacks', icono: '🍟', img: 'snack-papas.jpg',   precio: 8,  stock: 20, det: ['Porción grande', 'Con salsas'] },
+    { id: 'sn-nachos',  nombre: 'Nachos',         tipo: 'snacks', icono: '🧀', img: 'snack-nachos.jpg',  precio: 10, stock: 20, det: ['Con queso cheddar', 'Para compartir'] },
+    { id: 'sn-gaseosa', nombre: 'Gaseosa',        tipo: 'snacks', icono: '🥤', img: 'snack-gaseosa.jpg', precio: 6,  stock: 20, det: ['500 ml', 'Varios sabores'] },
+    { id: 'sn-agua',    nombre: 'Agua mineral',   tipo: 'snacks', icono: '💧', img: 'snack-agua.jpg',    precio: 4,  stock: 20, det: ['500 ml', 'Con o sin gas'] },
+    { id: 'sn-energy',  nombre: 'Energizante',    tipo: 'snacks', icono: '⚡', img: 'snack-energy.jpg',  precio: 12, stock: 20, det: ['Lata 250 ml', 'Bien frío'] },
+    { id: 'sn-cafe',    nombre: 'Café o té',      tipo: 'snacks', icono: '☕', img: 'snack-cafe.jpg',    precio: 6,  stock: 20, det: ['Caliente', 'Con azúcar aparte'] },
+    { id: 'sn-brownie', nombre: 'Brownie',        tipo: 'snacks', icono: '🍫', img: 'snack-brownie.jpg', precio: 8,  stock: 20, det: ['Chocolate', 'Porción individual'] },
+    { id: 'sn-helado',  nombre: 'Helado',         tipo: 'snacks', icono: '🍦', img: 'snack-helado.jpg',  precio: 7,  stock: 20, det: ['Vainilla o chocolate', 'Copa individual'] }
+  ];
+
+  let catalogo      = [];     // máquinas + snacks (copias de los arrays)
   let errorCarga    = false;
-  let pedido        = {};
+  let pedido        = {};     // { idItem: cantidad } (máquinas y snacks)
+  let horas         = 1;
   let reservas      = [];
-  let cola          = [];
-  let deadline      = null;
+  let colaSync      = [];     // ARRAY: cola de sincronización (reservas pendientes de envío)
+  let enviando      = false;
+  let reservaACancelar = null;
+  let deadline      = null;   // momento en que vence el plazo de 5 min
   let modalDeadline = null;
+  let flashFijo     = null;   // null = calcular al momento; true/false = fijo mientras se confirma
+  let flashPrev     = false;
   let timerId       = null;
   let resizeId      = null;
   let vistaActual   = 'inicio';
@@ -41,20 +145,29 @@ $(document).ready(function () {
   let pagina        = 0;
   let paso          = 1;
   let estacionAbierta = null;
-  let promptInstalar  = window.__instalar || null;
 
   /* ============================================
      UTILIDADES
      ============================================ */
-  function porId(id) { return estaciones.find(function (e) { return e.id === id; }); }
-  function totalMaquinas() { return Object.keys(pedido).reduce(function (a, k) { return a + pedido[k]; }, 0); }
+  function porId(id) { return catalogo.find(function (e) { return e.id === id; }); }
+  function esSnack(e) { return e.tipo === 'snacks'; }
+  function unidades(deSnacks) {
+    return Object.keys(pedido).reduce(function (a, id) {
+      const e = porId(id);
+      return (e && esSnack(e) === deSnacks) ? a + pedido[id] : a;
+    }, 0);
+  }
+  function totalMaquinas() { return unidades(false); }
+  function totalSnacks()   { return unidades(true); }
+  function totalItems()    { return totalMaquinas() + totalSnacks(); }
+  function precioTxt(e) { return e.precio + (esSnack(e) ? ' BOB' : ' BOB/h'); }
+  function enReservaTxt(e) {
+    return 'En tu reserva: ' + (pedido[e.id] || 0) + (esSnack(e) ? ' unidad(es)' : ' máquina(s)');
+  }
   function fmt(n) { return Number(n.toFixed(2)); }
   function mmss(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
   // Escapa texto antes de meterlo en una plantilla HTML (anti-XSS)
   function esc(s) { return $('<div>').text(String(s)).html().replace(/"/g, '&quot;'); }
-  function linea(a, b, cls) {
-    return $('<li>').addClass(cls || '').append($('<span>').text(a), $('<b>').text(b));
-  }
 
   /* ============================================
      1. HIDRATACIÓN reutilizable (el HTML llega estático)
@@ -69,91 +182,87 @@ $(document).ready(function () {
   }
 
   /* ============================================
-     2. INSTALACIÓN DE LA PWA (botón ⬇️)
-     ============================================ */
-  function registrarInstalacion() {
-    const esStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    if (esStandalone) { $('#btnInstalar').addClass('oculto'); return; }
-
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
-      promptInstalar = e;
-    });
-    window.addEventListener('appinstalled', function () {
-      promptInstalar = null;
-      $('#btnInstalar').addClass('oculto');
-      toast('✅ ¡App instalada!', 'exito');
-    });
-
-    $('#btnInstalar').off('click').on('click', function () {
-      if (!promptInstalar) { abrirModal('m-instalar'); return; }
-      promptInstalar.prompt();
-      promptInstalar.userChoice.then(function (r) {
-        if (r.outcome === 'accepted') toast('⬇️ Instalando…', 'exito');
-        promptInstalar = null;
-      });
-    });
-  }
-
-  /* ============================================
-     3. ESTADO DE RED (Offline-First) + sincronización
+     3. ESTADO DE RED (Offline-First) + COLA DE SINCRONIZACIÓN (array)
      ============================================ */
   function actualizarEstadoRed() {
     const $r = $('#estadoRed');
     if (navigator.onLine) {
       $r.removeClass('off').addClass('on').find('.ic').text('🟢');
       $r.find('.txt').text('En línea');
-      sincronizar();
+      procesarCola();
     } else {
       $r.removeClass('on').addClass('off').find('.ic').text('🟠');
       $r.find('.txt').text('Offline · datos locales');
     }
   }
 
-  function sincronizar() {
-    if (!reservas.some(function (r) { return r.estado === 'pendiente'; })) return;
-    setTimeout(function () {
-      if (!navigator.onLine) return;
-      reservas.forEach(function (r) { if (r.estado === 'pendiente') r.estado = 'verificada'; });
-      guardar();
-      renderReservas();
-      toast('✅ Reservas pendientes sincronizadas', 'exito');
-    }, 1200);
+  // Servidor simulado (0,6 s). Con un servidor real, aquí iría el fetch POST.
+  function enviarAlServidor(item) {
+    return new Promise(function (ok) { setTimeout(ok, 600); });
+  }
+
+  // Vacía la cola de a una reserva (primero en entrar, primero en salir)
+  function procesarCola() {
+    if (enviando || !navigator.onLine || !colaSync.length) return;
+    enviando = true;
+    (function siguiente() {
+      if (!colaSync.length || !navigator.onLine) { enviando = false; return; }
+      const item = colaSync[0];
+      enviarAlServidor(item).then(function () {
+        // sale de la cola (por código: si se canceló mientras se enviaba, no se toca otra)
+        colaSync = colaSync.filter(function (x) { return x.codigo !== item.codigo; });
+        marcarVerificada(item.codigo);
+        guardar();
+        siguiente();
+      }).catch(function () { enviando = false; });   // si falla, se queda en la cola para reintentar
+    })();
+  }
+
+  // Pendiente → verificada (una reserva cancelada no cambia)
+  function marcarVerificada(codigo) {
+    const r = reservas.find(function (x) { return x.codigo === codigo; });
+    if (!r || r.estado !== 'pendiente') return;
+    r.estado = 'verificada';
+    renderReservas();
+    toast('✅ Reserva ' + codigo + ' verificada', 'exito');
   }
 
   function registrarRed() {
     $(window).off('online.red offline.red').on('online.red offline.red', actualizarEstadoRed);
+
+    // El Service Worker avisa cuando vuelve la red (Background Sync)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function (e) {
+        if (e.data && e.data.tipo === 'red-disponible') procesarCola();
+      });
+    }
   }
 
   /* ============================================
-     4. CATÁLOGO: fetch + lazy loading + PAGINADO (sin scroll)
+     4. CATÁLOGO: array + lazy loading + PAGINADO (sin scroll)
      ============================================ */
   function cargarCatalogo() {
-    return fetch('data/estaciones.json')
-      .then(function (res) {
-        if (!res.ok) throw new Error('Error al cargar el catálogo (' + res.status + ')');
-        return res.json();
-      })
-      .then(function (data) {
-        estaciones = data;
-        errorCarga = false;
-        $('#stat-total').text(estaciones.reduce(function (a, e) { return a + e.stock; }, 0));
-        $('#stat-min').text(Math.min.apply(null, estaciones.map(function (e) { return e.precio; })));
-      })
-      .catch(function (err) {
-        console.error('Fallo en catálogo:', err);
-        errorCarga = true;
-      });
+    // Se copian los arrays para no modificar los originales
+    catalogo = ESTACIONES.concat(SNACKS).map(function (e) { return Object.assign({}, e); });
+    errorCarga = false;
+    const maquinas = catalogo.filter(function (e) { return !esSnack(e); });
+    $('#stat-total').text(maquinas.reduce(function (a, e) { return a + e.stock; }, 0));
+    $('#stat-min').text(Math.min.apply(null, maquinas.map(function (e) { return e.precio; })));
+    renderPopulares();
+    return Promise.resolve();   // el bloque final usa .then()
   }
 
   function filtradas() {
-    return catActual === 'catalogo' ? estaciones : estaciones.filter(function (e) { return e.tipo === catActual; });
+    return catActual === 'catalogo' ? catalogo : catalogo.filter(function (e) { return e.tipo === catActual; });
   }
 
-  // Cuántas tarjetas caben según el tamaño real de la pantalla
+  // Cuántas tarjetas caben según el tamaño real de la zona del catálogo
   function calcTamano() {
     const w = window.innerWidth;
-    const cols = w >= 992 ? 3 : (w >= 640 ? 2 : 1);
+    const wC = $('#catalogoArcade').width();
+    const cols = wC > 40
+      ? Math.max(1, Math.min(4, Math.floor((wC + GAP) / (ANCHO_MIN + GAP))))
+      : (w >= 992 ? 3 : (w >= 640 ? 2 : 1));
     const h = $('#catalogoArcade').height();
     if (h < 40) return { cols: cols, porPagina: cols * 4 };
     const filas = Math.max(1, Math.floor((h + GAP) / (ALTO_FILA + GAP)));
@@ -163,7 +272,7 @@ $(document).ready(function () {
   function renderCatalogo() {
     const $g = $('#catalogoArcade');
     if (errorCarga) {
-      $g.html('<p class="error-carga">⚠️ No se pudo cargar el catálogo. Revisa tu conexión.</p>');
+      $g.html('<p class="error-carga">⚠️ No se pudo cargar el catálogo.</p>');
       $('#pgInfo').text('—'); $('#pgPrev, #pgNext').prop('disabled', true);
       return;
     }
@@ -186,7 +295,7 @@ $(document).ready(function () {
           '</div>' +
           '<div class="info-pista abrir-det">' +
             '<h4 class="titulo-truncado">' + esc(e.nombre) + '</h4>' +
-            '<p class="precio">' + e.precio + ' BOB/h</p>' +
+            '<p class="precio">' + esc(precioTxt(e)) + '</p>' +
             '<small class="mas-det">Toca para ver detalles</small>' +
           '</div>' +
           '<div class="contador">' +
@@ -212,7 +321,7 @@ $(document).ready(function () {
     });
   }
 
-  // Ventana flotante con el detalle de una estación (todo con .text())
+  // Ventana flotante con el detalle (todo con .text())
   function abrirDetalle(id) {
     const e = porId(id);
     if (!e) return;
@@ -220,10 +329,11 @@ $(document).ready(function () {
     $('#detTitulo').text(e.nombre);
     $('#detInsignia').text(ETIQUETA[e.tipo]);
     $('#detStock').text(e.stock + ' disponibles');
-    $('#detPrecio').text(e.precio + ' BOB / hora por máquina');
+    $('#detPrecio').text(esSnack(e) ? e.precio + ' BOB por unidad' : e.precio + ' BOB / hora por máquina');
     const $ul = $('#detLista').empty();
     e.det.forEach(function (d) { $ul.append($('<li>').text(d)); });
-    $('#detEnGrupo').text('En tu grupo: ' + (pedido[id] || 0) + ' máquina(s)');
+    $('#detEnGrupo').text(enReservaTxt(e));
+    $('#detAgregar').text(esSnack(e) ? '+ Agregar al pedido' : '+ Agregar al grupo');
     abrirModal('m-detalle');
   }
 
@@ -248,17 +358,19 @@ $(document).ready(function () {
     $('#detAgregar').off('click').on('click', function () {
       if (estacionAbierta) {
         agregarUno(estacionAbierta);
-        $('#detEnGrupo').text('En tu grupo: ' + (pedido[estacionAbierta] || 0) + ' máquina(s)');
+        $('#detEnGrupo').text(enReservaTxt(porId(estacionAbierta)));
       }
     });
 
     if (CATEGORIAS.indexOf(vistaActual) > -1) renderCatalogo();
   }
 
+  // Devuelve true si se agregó (false si no hay más stock)
   function agregarUno(id) {
     const e = porId(id), actual = pedido[id] || 0;
-    if (actual >= e.stock) { toast('⚠️ Solo hay ' + e.stock + ' de "' + e.nombre + '"', 'error'); return; }
+    if (actual >= e.stock) { toast('⚠️ Solo hay ' + e.stock + ' de "' + e.nombre + '"', 'error'); return false; }
     setQty(id, actual + 1);
+    return true;
   }
 
   function setQty(id, q) {
@@ -266,12 +378,55 @@ $(document).ready(function () {
     q = Math.max(0, Math.min(e.stock, q));
     if (q > 0) { pedido[id] = q; } else { delete pedido[id]; }
 
-    if (totalMaquinas() > 0) { if (!deadline) deadline = Date.now() + PLAZO * 1000; }
-    else { deadline = null; }
+    if (totalItems() > 0) {
+      if (!deadline) deadline = Date.now() + PLAZO * 1000;   // arranca el plazo (y el descuento Flash)
+    } else {
+      deadline = null;
+      flashPrev = false;
+      pintarPlazo(null);
+    }
 
     syncTarjetas();
     renderResumen();
     programarTick();
+  }
+
+  /* ============================================
+     4b. PANEL LATERAL DE INICIO (pantallas grandes): abierto ahora + populares
+     ============================================ */
+  function estadoAbierto() {
+    const h = new Date().getHours();
+    const abierto = h >= 18 || h < 2;   // 18:00 a 02:00
+    $('#estadoAbierto').removeClass('si no').addClass(abierto ? 'si' : 'no')
+      .text(abierto ? '🟢 Abierto ahora · cierra a las 02:00' : '🔴 Cerrado · abre a las 18:00');
+  }
+
+  function renderPopulares() {
+    const $ul = $('#listaPopulares').empty();
+    catalogo.filter(function (e) { return e.popular; }).slice(0, 4).forEach(function (e) {
+      const $li = $('<li>').addClass('pop-fila').attr('data-id', e.id);
+      $li.append(
+        $('<span>').addClass('pop-ico').text(e.icono),
+        $('<div>').addClass('pop-info').append(
+          $('<span>').addClass('titulo-truncado').text(e.nombre),
+          $('<small>').text(precioTxt(e))
+        ),
+        $('<button>').addClass('btn-tactil pop-add').attr('aria-label', 'Agregar ' + e.nombre).text('+')
+      );
+      $ul.append($li);
+    });
+  }
+
+  // Hidratación del panel: delegación con .off().on()
+  function activarLado() {
+    $('#listaPopulares').off('click.pop');
+    $('#listaPopulares').on('click.pop', '.pop-add', function () {
+      const id = $(this).closest('.pop-fila').data('id');
+      if (agregarUno(id)) toast('➕ ' + porId(id).nombre + ' agregado', 'exito');
+    });
+    $('#listaPopulares').on('click.pop', '.pop-info', function () {
+      abrirDetalle($(this).closest('.pop-fila').data('id'));
+    });
   }
 
   /* ============================================
@@ -286,14 +441,14 @@ $(document).ready(function () {
     cerrarModal();
     $('[data-pagina]').removeClass('activo').filter('[data-pagina="' + vista + '"]').addClass('activo');
     $('.vista').stop(true, true).hide();
-        $('#v-' + vista).fadeIn(300).scrollTop(0);
+    $('#v-' + vista).fadeIn(300).scrollTop(0);
 
     if (esCat) {
       catActual = nombre;
       pagina = 0;
       const t = TEMAS[nombre];
       // Cambio dinámico de temática e ícono (addClass / removeClass / .html)
-      $('#bannerTema').removeClass('tema-todos tema-ps5 tema-pc tema-arcade').addClass(t.clase);
+      $('#bannerTema').removeClass('tema-todos tema-ps5 tema-pc tema-arcade tema-snacks').addClass(t.clase);
       $('#bannerIcono').html(t.icono);
       $('#bannerTitulo').text(t.titulo);
       $('#bannerSub').text(t.sub);
@@ -301,6 +456,7 @@ $(document).ready(function () {
       renderCatalogo();
       $('#catalogoArcade').hide().fadeIn(350);
     }
+    if (vista === 'inicio') estadoAbierto();
     actualizarBadge();
   }
 
@@ -314,84 +470,120 @@ $(document).ready(function () {
     $(window).off('resize.cat orientationchange.cat').on('resize.cat orientationchange.cat', function () {
       clearTimeout(resizeId);
       resizeId = setTimeout(function () {
-        if (CATEGORIAS.indexOf(vistaActual) > -1 && estaciones.length) renderCatalogo();
+        if (CATEGORIAS.indexOf(vistaActual) > -1 && catalogo.length) renderCatalogo();
       }, 200);
     });
   }
 
   /* ============================================
-     6. CALCULADOR + COMBOS
+     6. CÁLCULO: horas, snacks y TARIFA FLASH automática
      ============================================ */
+  // Flash activo = aún estamos en los primeros FLASH segundos del plazo
+  function flashActivo() {
+    return !!deadline && Date.now() < deadline - (PLAZO - FLASH) * 1000;
+  }
+  // Mientras se confirma (30 s) el descuento queda fijo
+  function flashVigente() {
+    return flashFijo !== null ? flashFijo : flashActivo();
+  }
+
   function calcular() {
-    const horas  = Math.min(12, Math.max(1, parseInt($('#hrs').val()) || 1));
-    const factor = Number($('#rate').val());
-    const items = [];
-    let bruto = 0;
+    const flash = flashVigente();
+    const items = [], snacks = [];
+    let bruto = 0, totalSn = 0;
 
     Object.keys(pedido).forEach(function (id) {
       const e = porId(id);
       if (!e) return;
-      const sub = e.precio * pedido[id] * horas;
-      items.push({ e: e, q: pedido[id], sub: sub });
-      bruto += sub;
-    });
-    const desc = bruto * (1 - factor);
-
-    const combos = [];
-    let totalCombos = 0;
-    $('.combo').each(function () {
-      const q = Number($(this).find('.qty').text());
-      if (q > 0) {
-        const sub = q * Number($(this).data('price'));
-        combos.push({ nombre: String($(this).data('name')), q: q, sub: sub });
-        totalCombos += sub;
+      if (esSnack(e)) {
+        const sub = e.precio * pedido[id];
+        snacks.push({ e: e, q: pedido[id], sub: sub });
+        totalSn += sub;
+      } else {
+        const sub = e.precio * pedido[id] * horas;     // las máquinas se cobran por hora
+        items.push({ e: e, q: pedido[id], sub: sub });
+        bruto += sub;
       }
     });
-    return { horas: horas, factor: factor, items: items, bruto: bruto, desc: desc, combos: combos, totalCombos: totalCombos, total: bruto - desc + totalCombos };
+    const desc = flash ? bruto * DESC_FLASH : 0;         // el descuento Flash es solo para máquinas
+    return { horas: horas, flash: flash, items: items, snacks: snacks, bruto: bruto, desc: desc, totalSnacks: totalSn, total: bruto - desc + totalSn };
   }
 
   /* ============================================
-     7. RESUMEN COMPACTO + DETALLE (ventana) + ESTADOS
+     7. RESUMEN EDITABLE (− cantidad +) para máquinas, snacks y horas
      ============================================ */
+  // Una fila con su contador − +; los textos van con .text() (anti-XSS)
+  function filaEditable(id, titulo, subtitulo, qty, precio, sinMas) {
+    const $li = $('<li>').addClass('fila-edit').attr('data-id', id);
+    const $txt = $('<div>').addClass('fe-txt')
+      .append($('<span>').addClass('fe-nombre titulo-truncado').text(titulo),
+              $('<small>').text(subtitulo));
+    const $ctr = $('<div>').addClass('contador').append(
+      $('<button>').addClass('r-menos').attr('aria-label', 'Quitar uno').text('−'),
+      $('<span>').addClass('qty').text(qty),
+      $('<button>').addClass('r-mas').attr('aria-label', 'Agregar uno').prop('disabled', sinMas).text('+')
+    );
+    const $pr = $('<b>').addClass('fe-precio').text(precio);
+    return $li.append($txt, $ctr, $pr);
+  }
+
   function renderResumen() {
     const c = calcular();
-    const nM = totalMaquinas();
-    const nC = c.combos.reduce(function (a, k) { return a + k.q; }, 0);
 
-    // Resumen compacto (vista de reserva)
-    const $s = $('#resumenLineas').empty();
-    $s.append(linea('🎮 Máquinas', nM ? nM + ' · ' + fmt(c.bruto) + ' BOB' : '—'));
-    $s.append(linea('⏱️ Horas', c.horas + ' h'));
-    $s.append(linea('🍔 Combos', nC ? nC + ' · ' + fmt(c.totalCombos) + ' BOB' : '—'));
-    if (c.desc > 0) $s.append(linea('⚡ Tarifa Flash −15%', '−' + fmt(c.desc) + ' BOB', 'desc'));
+    // Horas
+    $('#horasVal').text(horas + (horas === 1 ? ' hora' : ' horas'));
+    $('#h-menos').prop('disabled', horas <= 1);
+    $('#h-mas').prop('disabled', horas >= 12);
 
-    // Detalle completo (ventana flotante)
-    const $ul = $('#order-list').empty();
-    if (!c.items.length && !c.combos.length) { $ul.append($('<li class="vacio">').text('Aún no seleccionas nada')); }
+    // Máquinas elegidas
+    const $m = $('#listaMaquinas').empty();
+    if (!c.items.length) {
+      $m.append($('<li class="vacio">').text('Aún no eliges máquinas. Ve al Catálogo: si confirmas en los primeros ' + (FLASH / 60) + ' min tienes −15 %.'));
+    }
     c.items.forEach(function (it) {
-      $ul.append(linea('🎮 ' + it.q + '× ' + it.e.nombre + ' × ' + c.horas + ' h', fmt(it.sub) + ' BOB'));
+      $m.append(filaEditable(it.e.id, it.e.nombre, it.e.precio + ' BOB/h c/u',
+        it.q, fmt(it.sub) + ' BOB', it.q >= it.e.stock));
     });
-    if (c.desc > 0) $ul.append(linea('⚡ Tarifa Flash −15%', '−' + fmt(c.desc) + ' BOB', 'desc'));
-    c.combos.forEach(function (k) { $ul.append(linea('🍔 ' + k.nombre + ' × ' + k.q, fmt(k.sub) + ' BOB')); });
 
+    // Snacks elegidos
+    const $s = $('#listaSnacks').empty();
+    if (!c.snacks.length) {
+      $s.append($('<li class="vacio">').text('Sin snacks. Agrégalos desde el Catálogo (pestaña Snacks).'));
+    }
+    c.snacks.forEach(function (it) {
+      $s.append(filaEditable(it.e.id, it.e.nombre, it.e.precio + ' BOB c/u',
+        it.q, fmt(it.sub) + ' BOB', it.q >= it.e.stock));
+    });
+
+    // Descuento y total
+    $('#descLinea').toggleClass('oculto', !(c.desc > 0));
+    $('#descVal').text('−' + fmt(c.desc) + ' BOB');
     $('#total-price').text(fmt(c.total) + ' BOB').stop(true, true)
       .animate({ fontSize: '1.5rem' }, 120).animate({ fontSize: '1.2rem' }, 120);
-    $('#total-modal').text(fmt(c.total) + ' BOB');
 
-    // Estados de los botones de la reserva
-    $('#tileCalc').text(c.horas + ' h · ' + (c.factor < 1 ? 'Flash' : 'Normal'));
-    $('#tileCombos').text(nC ? nC + ' combo(s)' : 'Ninguno');
-    $('#tilePedido').text((c.items.length + c.combos.length) + ' ítems');
-    const completos = datosCompletos();
-    $('#tileDatos').text(completos ? '✅ Completos' : 'Pendiente').toggleClass('ok', completos);
+    // Mini resumen del panel lateral (pantallas grandes)
+    $('#miniMaq').text(totalMaquinas());
+    $('#miniSnk').text(totalSnacks());
+    $('#miniTotal').text(fmt(c.total) + ' BOB');
 
-    if ($('#personas').val()) validarCampo('personas');
+    estadoDatos();
     actualizarBadge();
     guardar();
   }
 
+  // + o − sobre una fila del Resumen
+  function cambiar($fila, delta) {
+    const id = $fila.data('id');
+    setQty(id, (pedido[id] || 0) + delta);
+  }
+
+  function estadoDatos() {
+    const completos = datosCompletos();
+    $('#tileDatos').text(completos ? '✅ Completos' : 'Pendiente').toggleClass('ok', completos);
+  }
+
   function actualizarBadge() {
-    const n = totalMaquinas();
+    const n = totalItems();
     $('#navBadge').text(n).toggleClass('oculto', n === 0);
   }
 
@@ -400,19 +592,13 @@ $(document).ready(function () {
      ============================================ */
   const LETRAS = 'A-Za-zÁÉÍÓÚÜáéíóúüÑñ';
   const reglas = {
-    nombre:   function (v) { return new RegExp('^[' + LETRAS + ']{2,}(\\s+[' + LETRAS + ']{2,})+$').test(v.trim()) ? '' : 'Ingresa nombre y apellido (solo letras).'; },
-    ci:       function (v) { return /^\d{6,9}$/.test(v) ? '' : 'La CI debe tener entre 6 y 9 dígitos.'; },
-    tel:      function (v) { return /^[67]\d{7}$/.test(v) ? '' : 'Celular de 8 dígitos que empiece con 6 o 7.'; },
-    email:    function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? '' : 'Ingresa un correo válido.'; },
-    personas: function (v) {
-      const n = parseInt(v);
-      if (!n || n < 1 || n > 40) return 'Entre 1 y 40 personas.';
-      if (totalMaquinas() > n) return 'Tienes ' + totalMaquinas() + ' máquinas para ' + n + ' persona(s).';
-      return '';
-    },
-    fecha:    function (v) { return !v ? 'Elige una fecha.' : (v < $('#fecha').attr('min') ? 'La fecha no puede ser pasada.' : ''); },
-    hora:     function (v) { return v ? '' : 'Elige un horario.'; },
-    terms:    function (v) { return v ? '' : 'Debes aceptar las condiciones.'; }
+    nombre: function (v) { return new RegExp('^[' + LETRAS + ']{2,}(\\s+[' + LETRAS + ']{2,})+$').test(v.trim()) ? '' : 'Ingresa nombre y apellido (solo letras).'; },
+    ci:     function (v) { return /^\d{6,9}$/.test(v) ? '' : 'La CI debe tener entre 6 y 9 dígitos.'; },
+    tel:    function (v) { return /^[67]\d{7}$/.test(v) ? '' : 'Celular de 8 dígitos que empiece con 6 o 7.'; },
+    email:  function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? '' : 'Ingresa un correo válido.'; },
+    fecha:  function (v) { return !v ? 'Elige una fecha.' : (v < $('#fecha').attr('min') ? 'La fecha no puede ser pasada.' : ''); },
+    hora:   function (v) { return v ? '' : 'Elige un horario.'; },
+    terms:  function (v) { return v ? '' : 'Debes aceptar las condiciones.'; }
   };
 
   function valorCampo(id) {
@@ -431,7 +617,7 @@ $(document).ready(function () {
   }
 
   /* ============================================
-     9. FORMULARIO POR PASOS (ventana flotante)
+     9. FORMULARIO POR PASOS (ventana flotante) + HIDRATACIÓN DE LA RESERVA
      ============================================ */
   function mostrarPaso(n) {
     paso = n;
@@ -453,33 +639,22 @@ $(document).ready(function () {
   }
 
   function activarReserva() {
-    // Calculador
-    $('#hrs').off('input.calc').on('input.calc', renderResumen);
-    $('#hrs').off('change.calc').on('change.calc', function () {
-      $(this).val(Math.min(12, Math.max(1, parseInt($(this).val()) || 1)));
-      renderResumen();
-    });
-    $('#rate').off('change.calc').on('change.calc', renderResumen);
+    // Horas (− +)
+    $('#h-menos').off('click').on('click', function () { horas = Math.max(1, horas - 1); renderResumen(); });
+    $('#h-mas').off('click').on('click', function () { horas = Math.min(12, horas + 1); renderResumen(); });
 
-    // Combos (delegación sobre la ventana)
-    $('#m-combos').off('click.combo');
-    $('#m-combos').on('click.combo', '.c-mas', function () {
-      const $q = $(this).siblings('.qty');
-      $q.text(Number($q.text()) + 1);
-      renderResumen();
-    });
-    $('#m-combos').on('click.combo', '.c-menos', function () {
-      const $q = $(this).siblings('.qty');
-      if (Number($q.text()) > 0) $q.text(Number($q.text()) - 1);
-      renderResumen();
-    });
+    // Máquinas y snacks del Resumen: delegación (la lista se redibuja en cada cambio)
+    $('#hid-reserva').off('click.res');
+    $('#hid-reserva').on('click.res', '.r-mas', function () { cambiar($(this).closest('.fila-edit'), +1); });
+    $('#hid-reserva').on('click.res', '.r-menos', function () { cambiar($(this).closest('.fila-edit'), -1); });
 
     // Formulario
     $('#ci, #tel').off('input.solo').on('input.solo', function () { this.value = this.value.replace(/\D/g, ''); });
     $('#formReserva').off('.form')
       .on('input.form change.form focusout.form', 'input, select', function () {
         validarCampo(this.id);
-        renderResumen();
+        estadoDatos();
+        guardar();
       });
 
     $('#tileDatosBtn').off('click').on('click', function () { abrirCliente(1); });
@@ -523,6 +698,7 @@ $(document).ready(function () {
   function cerrarModal() {
     modalDeadline = null;
     $('.pantalla:visible').stop(true, true).fadeOut(200);
+    if (flashFijo !== null) { flashFijo = null; renderResumen(); }   // vuelve el cálculo en vivo
   }
 
   function registrarModales() {
@@ -542,15 +718,16 @@ $(document).ready(function () {
      11. CONFIRMACIÓN (30 s) + PROCESAR PAGO
      ============================================ */
   function abrirConfirmacion() {
+    flashFijo = flashActivo();          // el descuento queda fijo mientras confirmas
     const c = calcular();
     const detalle = c.items.map(function (it) { return it.q + '× ' + it.e.nombre; }).join(', ');
-    const combosTxt = c.combos.length ? ' + ' + c.combos.length + ' combo(s)' : '';
+    const snacksTxt = totalSnacks() ? ' + ' + totalSnacks() + ' snack(s)' : '';
 
     $('#m-client').text($('#nombre').val().trim() + ' (CI ' + $('#ci').val() + ')');
-    $('#m-group').text($('#personas').val() + ' persona(s) · ' + totalMaquinas() + ' máquina(s)');
+    $('#m-group').text(totalMaquinas() + ' máquina(s) · ' + c.horas + (c.horas === 1 ? ' hora' : ' horas'));
     $('#m-when').text($('#fecha').val().split('-').reverse().join('/') + ' · ' + $('#hora').val());
-    $('#m-service').text(detalle + combosTxt);
-    $('#m-amount').text(fmt(c.total) + ' BOB (' + c.horas + (c.horas === 1 ? ' Hora' : ' Horas') + ')');
+    $('#m-service').text(detalle + snacksTxt);
+    $('#m-amount').text(fmt(c.total) + ' BOB' + (c.flash ? ' (⚡ Flash −15 %)' : ''));
 
     abrirModal('m-confirm');
     modalDeadline = Date.now() + TIEMPO_MODAL * 1000;   // después de abrir (abrirModal no lo toca)
@@ -570,29 +747,43 @@ $(document).ready(function () {
       const c = calcular();
       const online = navigator.onLine;
       const nombre = $('#nombre').val().trim();
-      const resumen = c.items.map(function (it) { return it.q + '× ' + it.e.nombre; }).join(', ') + ' · ' + fmt(c.total) + ' BOB';
+      const resumen = c.items.map(function (it) { return it.q + '× ' + it.e.nombre; }).join(', ') +
+        (totalSnacks() ? ' + ' + totalSnacks() + ' snack(s)' : '') +
+        ' · ' + fmt(c.total) + ' BOB' + (c.flash ? ' · ⚡ Flash −15 %' : '');
+      const cuando = $('#fecha').val().split('-').reverse().join('/') + ' · ' + $('#hora').val();
 
-      // UI optimista: se confirma al instante; sin red queda "pendiente"
-      reservas.unshift({
+      // UI optimista: se confirma al instante y nace "pendiente"
+      const reserva = {
         codigo: 'LU-' + Date.now().toString(36).toUpperCase().slice(-5),
-        nombre: nombre, resumen: resumen, estado: online ? 'verificada' : 'pendiente'
-      });
+        nombre: nombre, resumen: resumen, cuando: cuando, estado: 'pendiente'
+      };
+      reservas.unshift(reserva);
       if (reservas.length > 20) reservas.pop();
+      colaSync.push({ codigo: reserva.codigo, nombre: nombre, resumen: resumen });   // entra a la cola
 
       cerrarModal();
       reiniciarPedido(true);
       renderReservas();
-      toast(online ? '✅ ¡Reserva confirmada, ' + nombre.split(' ')[0] + '!' : '💾 Guardada localmente · Pendiente de envío', online ? 'exito' : 'error');
+      toast(online ? '📨 ¡Gracias, ' + nombre.split(' ')[0] + '! Enviando tu reserva…'
+                   : '💾 Guardada localmente · Pendiente de envío', online ? 'exito' : 'error');
       location.hash = 'pedidos';
+
+      if (online) {
+        procesarCola();
+      } else if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        // Sin red: se le pide al Service Worker que avise cuando vuelva
+        navigator.serviceWorker.ready
+          .then(function (reg) { return reg.sync.register('sync-reservas'); })
+          .catch(function () {});
+      }
     });
   }
 
   function reiniciarPedido(limpiarForm) {
     pedido = {};
+    horas = 1;
     deadline = null;
-    $('#hrs').val(1);
-    $('#rate').val('1');
-    $('.qty').text(0);
+    flashPrev = false;
     syncTarjetas();
 
     if (limpiarForm) {
@@ -620,16 +811,17 @@ $(document).ready(function () {
       if (r <= 0) {
         cerrarModal();
         reiniciarPedido(false);
-        toast('⏰ Tarifa Flash Expirada: se agotó tu plazo', 'error');
+        toast('⏰ Se agotó tu plazo de 5 minutos. Vuelve a elegir', 'error');
       } else {
         pintarPlazo(r);
+        controlFlash();
       }
     }
     if (modalDeadline) {
       const m = Math.ceil((modalDeadline - Date.now()) / 1000);
       if (m <= 0) {
         cerrarModal();
-        toast('⏰ Tarifa Flash Expirada', 'error');
+        toast('⏰ Se agotó el tiempo para confirmar', 'error');
       } else {
         pintarModal(m);
       }
@@ -646,64 +838,81 @@ $(document).ready(function () {
     $('#holdFill').css('width', (r / PLAZO * 100) + '%');
   }
 
+  // Cuenta regresiva del descuento Flash y aviso cuando termina
+  function controlFlash() {
+    const activo = flashActivo();
+    const restante = deadline ? Math.ceil((deadline - (PLAZO - FLASH) * 1000 - Date.now()) / 1000) : 0;
+
+    $('#flashRow, #miniFlash').toggleClass('oculto', !activo);
+    if (activo) {
+      $('#flashTimer, #miniFlashT').text(mmss(restante));
+      $('#flashTimer').toggleClass('peligro', restante <= 30);
+    }
+
+    if (flashPrev && !activo && flashFijo === null && deadline) {
+      renderResumen();   // el total vuelve a tarifa normal
+      toast('⚡ Terminó el descuento Flash: ahora tarifa normal', 'error');
+    }
+    flashPrev = activo;
+  }
+
   /* ============================================
-     13. MIS RESERVAS (anti-XSS: nodos con .text())
+     13. HISTORIAL: MIS RESERVAS (anti-XSS) + CANCELAR
      ============================================ */
   function renderReservas() {
     const $ul = $('#listaReservas').empty();
     if (!reservas.length) {
-      $ul.append($('<li class="item-reserva vacio">').text('Aún no hay reservas confirmadas.'));
+      $ul.append($('<li class="item-reserva vacio">').text('Aún no hay reservas.'));
     }
     reservas.forEach(function (r) {
-      const $li = $('<li>').addClass('item-reserva');
-      const $txt = $('<div>').addClass('titulo-truncado')
-        .append($('<strong>').text(r.nombre + ' — '), $('<span>').text(r.resumen));
-      const $estado = $('<span>').addClass('estado ' + r.estado)
-        .text(r.estado === 'pendiente' ? '⏳ Guardado localmente · Pendiente' : '✅ Verificada');
-      $li.append($txt, $estado);
+      const $li = $('<li>').addClass('item-reserva ' + r.estado);
+      const $txt = $('<div>').addClass('res-txt').append(
+        $('<strong>').addClass('titulo-truncado').text(r.codigo + ' · ' + r.nombre),
+        $('<small>').addClass('res-det').text(r.resumen)
+      );
+      if (r.cuando) $txt.append($('<small>').addClass('res-cuando').text('📅 ' + r.cuando));
+
+      const $acc = $('<div>').addClass('res-acc').append(
+        $('<span>').addClass('estado ' + r.estado).text(ESTADOS[r.estado] || r.estado)
+      );
+      if (r.estado !== 'cancelada') {
+        $acc.append($('<button>').addClass('btn-ghost btn-cancelar').attr('data-codigo', r.codigo).text('Cancelar'));
+      }
+      $li.append($txt, $acc);
       $ul.append($li);
     });
-    $('#tileReservas').text(reservas.length + ' reserva(s)');
     guardar();
   }
 
-  /* ============================================
-     14. COLA "PEDIR JUEGO" (delegación con .off().on())
-     ============================================ */
-  function renderCola() {
-    const $box = $('#listaCola').empty();
-    cola.forEach(function (tema) {
-      const $fila = $('<div>').addClass('fila-cancion');
-      const $titulo = $('<span>').addClass('titulo-truncado').text(tema);       // .text(), nunca .html()
-      const $quitar = $('<button>').addClass('btn-tactil btn-quitar').attr('aria-label', 'Quitar').text('✕');
-      $fila.append($titulo, $quitar);
-      $box.append($fila);
-    });
-    $('#tileCola').text(cola.length + ' en cola');
+  function cancelarReserva(codigo) {
+    const r = reservas.find(function (x) { return x.codigo === codigo; });
+    if (!r || r.estado === 'cancelada') return;
+    r.estado = 'cancelada';
+    // si estaba pendiente de envío, sale de la cola de sincronización
+    colaSync = colaSync.filter(function (x) { return x.codigo !== codigo; });
+    renderReservas();
+    toast('🚫 Reserva ' + codigo + ' cancelada', 'error');
   }
 
-  function activarPedidos() {
-    function pedir() {
-      const tema = $('#inputJuego').val().trim();
-      if (!tema) return;
-      cola.push(tema);
-      renderCola();
-      guardar();
-      $('#inputJuego').val('');
-    }
-    $('#btnPedir').off('click').on('click', pedir);
-    $('#inputJuego').off('keyup.pedir').on('keyup.pedir', function (e) { if (e.key === 'Enter') pedir(); });
+  // Delegación con .off().on(): los botones se redibujan en cada cambio
+  function registrarHistorial() {
+    $('#listaReservas').off('click.cancelar', '.btn-cancelar');
+    $('#listaReservas').on('click.cancelar', '.btn-cancelar', function () {
+      reservaACancelar = String($(this).attr('data-codigo'));
+      const r = reservas.find(function (x) { return x.codigo === reservaACancelar; });
+      $('#cancelTexto').text('¿Cancelar la reserva ' + reservaACancelar + (r ? ' de ' + r.nombre : '') + '?');
+      abrirModal('m-cancelar');
+    });
 
-    $('#listaCola').off('click', '.btn-quitar').on('click', '.btn-quitar', function () {
-      const idx = $(this).closest('.fila-cancion').index();
-      cola.splice(idx, 1);
-      renderCola();
-      guardar();
+    $('#btnSiCancelar').off('click').on('click', function () {
+      if (reservaACancelar) cancelarReserva(reservaACancelar);
+      reservaACancelar = null;
+      cerrarModal();
     });
   }
 
   /* ============================================
-     15. EXTRAS: hide/show, fadeToggle, tema, teclado
+     14. EXTRAS: hide/show, fadeToggle, tema, teclado
      ============================================ */
   function registrarExtras() {
     $('#hint-close').off('click').on('click', function () {
@@ -729,7 +938,7 @@ $(document).ready(function () {
   }
 
   /* ============================================
-     16. TOAST: slideDown → 3 s → fadeOut
+     15. TOAST: slideDown → 3 s → fadeOut
      ============================================ */
   function toast(mensaje, tipo) {
     $('<div class="toast ' + (tipo || '') + '"></div>')
@@ -739,17 +948,15 @@ $(document).ready(function () {
   }
 
   /* ============================================
-     17. PERSISTENCIA (localStorage: datos locales, Offline-First)
+     16. PERSISTENCIA (localStorage: guarda los arrays, Offline-First)
      ============================================ */
   function guardar() {
     try {
-      const combos = {};
-      $('.combo').each(function () { combos[$(this).data('name')] = Number($(this).find('.qty').text()); });
       const form = {};
       CAMPOS.forEach(function (id) { form[id] = valorCampo(id); });
       localStorage.setItem(KEY, JSON.stringify({
-        pedido: pedido, deadline: deadline, hrs: $('#hrs').val(), rate: $('#rate').val(),
-        combos: combos, form: form, reservas: reservas, cola: cola
+        pedido: pedido, deadline: deadline, hrs: horas,
+        form: form, reservas: reservas, colaSync: colaSync
       }));
     } catch (e) { /* sin almacenamiento */ }
   }
@@ -760,7 +967,13 @@ $(document).ready(function () {
     if (!s) return;
 
     reservas = Array.isArray(s.reservas) ? s.reservas : [];
-    cola     = Array.isArray(s.cola) ? s.cola : [];
+    colaSync = Array.isArray(s.colaSync) ? s.colaSync : [];
+    // Reservas pendientes que no quedaron en la cola
+    reservas.forEach(function (r) {
+      if (r.estado === 'pendiente' && !colaSync.some(function (x) { return x.codigo === r.codigo; })) {
+        colaSync.push({ codigo: r.codigo, nombre: r.nombre, resumen: r.resumen });
+      }
+    });
 
     if (s.form) {
       CAMPOS.forEach(function (id) {
@@ -775,10 +988,8 @@ $(document).ready(function () {
         const e = porId(id);
         if (e) pedido[id] = Math.min(e.stock, s.pedido[id]);
       });
-      deadline = s.deadline;
-      $('#hrs').val(s.hrs || 1);
-      $('#rate').val(s.rate || '1');
-      $('.combo').each(function () { $(this).find('.qty').text((s.combos || {})[$(this).data('name')] || 0); });
+      deadline = totalItems() > 0 ? s.deadline : null;
+      horas = Math.min(12, Math.max(1, parseInt(s.hrs) || 1));
     } else if (hayPedido) {
       setTimeout(function () { toast('⏰ Tu plazo anterior expiró. Vuelve a elegir', 'error'); }, 700);
     }
@@ -792,14 +1003,14 @@ $(document).ready(function () {
     $('#fecha').attr('min', h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0') + '-' + String(h.getDate()).padStart(2, '0'));
   })();
 
-  registrarInstalacion();
   registrarRed();
   registrarNavegacion();
   registrarModales();
   registrarPago();
+  registrarHistorial();
   registrarExtras();
 
-  // Hidratación escalonada
+  // Hidratación escalonada (solo lo que tiene botones activos)
   hidratar('hid-menu', 500, function () {
     $('#burguerBtn').text('☰').off('click').on('click', function () {
       $('#navMenu').stop(true, true).slideToggle(300);
@@ -807,15 +1018,16 @@ $(document).ready(function () {
   });
   hidratar('hid-catalogo', 700, activarCatalogo);
   hidratar('hid-reserva', 900, activarReserva);
-  hidratar('hid-pedidos', 1100, activarPedidos);
+  hidratar('hid-lado', 1100, activarLado);
 
-  // Primero los datos (fetch), luego el estado local y la vista
+  // Primero el catálogo (arrays), luego el estado local y la vista
   cargarCatalogo().then(function () {
     restaurar();
     renderResumen();
     syncTarjetas();
     renderReservas();
-    renderCola();
+    estadoAbierto();
+    procesarCola();    // si había reservas pendientes y ya hay red, se envían
     route(location.hash.replace('#', ''));
     if (deadline) { tick(); }
   });
