@@ -6,6 +6,42 @@ $(document).ready(function () {
   if (window.__arcadeInit) return;
   window.__arcadeInit = true;
 
+  /* ============================================
+     SEGURIDAD: DOMPurify (sanitiza todo HTML dinámico)
+     ============================================ */
+  function limpiar(html) {
+    if (window.DOMPurify) return DOMPurify.sanitize(html);
+    // Si la librería no cargó, se escapa el HTML: nunca se inyecta crudo
+    console.warn('DOMPurify no cargó: se escapa el HTML por seguridad');
+    return $('<div>').text(html).html();
+  }
+  function htmlSeguro($el, html) { $el.html(limpiar(html)); }
+  function renderizarDetalleSeguro(html) { htmlSeguro($('#detLista'), html); }
+
+  // DOMPurify elimina onerror=, así que la imagen rota se maneja aquí
+  // (el evento error no burbujea: se escucha en la fase de captura)
+  document.addEventListener('error', function (e) {
+    if (e.target.tagName === 'IMG' && e.target.classList.contains('tarjeta__foto')) e.target.remove();
+  }, true);
+
+  /* ============================================
+     CORE WEB VITALS (se ven en la consola)
+     ============================================ */
+  if ('PerformanceObserver' in window) {
+    try {
+      new PerformanceObserver(function (lista) {
+        const e = lista.getEntries();
+        console.log('LCP:', Math.round(e[e.length - 1].startTime) + ' ms (meta ≤ 2500)');
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+
+      let cls = 0;
+      new PerformanceObserver(function (lista) {
+        lista.getEntries().forEach(function (e) { if (!e.hadRecentInput) cls += e.value; });
+        console.log('CLS:', cls.toFixed(3) + ' (meta ≤ 0.1)');
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch (err) { /* el navegador no soporta estas métricas */ }
+  }
+
   /* Carrusel de fondo para escritorio */
   const fotosFondo = ['img/fondo1.jpg', 'img/fondo2.jpg', 'img/fondo3.jpg'];
   const fondo = document.querySelector('.fondo-pc');
@@ -287,25 +323,25 @@ $(document).ready(function () {
     let html = '';
     slice.forEach(function (e) {
       html += '' +
-        '<article class="tarjeta-pista" data-id="' + esc(e.id) + '" data-type="' + esc(e.tipo) + '">' +
-          '<div class="media miniatura abrir-det img-' + esc(e.tipo) + '">' +
-            '<span class="emoji">' + esc(e.icono) + '</span>' +
-            '<img src="img/' + esc(e.img) + '" alt="' + esc(e.nombre) + '" loading="lazy" width="64" height="64" onerror="this.remove()">' +
-            '<span class="stock ' + (e.stock <= 2 ? 'bajo' : '') + '">' + e.stock + '</span>' +
+        '<article class="tarjeta" data-id="' + esc(e.id) + '" data-type="' + esc(e.tipo) + '">' +
+          '<div class="tarjeta__imagen tarjeta__imagen--' + esc(e.tipo) + ' js-detalle">' +
+            '<span class="tarjeta__emoji">' + esc(e.icono) + '</span>' +
+            '<img class="tarjeta__foto" src="img/' + esc(e.img) + '" alt="' + esc(e.nombre) + '" loading="lazy" width="64" height="64">' +
+            '<span class="tarjeta__stock' + (e.stock <= 2 ? ' tarjeta__stock--bajo' : '') + '">' + e.stock + '</span>' +
           '</div>' +
-          '<div class="info-pista abrir-det">' +
-            '<h4 class="titulo-truncado">' + esc(e.nombre) + '</h4>' +
-            '<p class="precio">' + esc(precioTxt(e)) + '</p>' +
-            '<small class="mas-det">Toca para ver detalles</small>' +
+          '<div class="tarjeta__info js-detalle">' +
+            '<h4 class="tarjeta__titulo">' + esc(e.nombre) + '</h4>' +
+            '<p class="tarjeta__precio">' + esc(precioTxt(e)) + '</p>' +
+            '<small class="tarjeta__mas">Toca para ver detalles</small>' +
           '</div>' +
           '<div class="contador">' +
-            '<button class="btn-menos" aria-label="Quitar">−</button>' +
-            '<span class="qty-est">0</span>' +
-            '<button class="btn-mas" aria-label="Agregar">+</button>' +
+            '<button class="js-menos" aria-label="Quitar">−</button>' +
+            '<span class="tarjeta__cantidad">0</span>' +
+            '<button class="js-mas" aria-label="Agregar">+</button>' +
           '</div>' +
         '</article>';
     });
-    $g.html(html);
+    htmlSeguro($g, html);   // DOMPurify antes de inyectar
     syncTarjetas();
 
     $('#pgInfo').text('Página ' + (pagina + 1) + ' / ' + paginas);
@@ -314,14 +350,14 @@ $(document).ready(function () {
   }
 
   function syncTarjetas() {
-    $('.tarjeta-pista').each(function () {
+    $('.tarjeta').each(function () {
       const q = pedido[$(this).data('id')] || 0;
-      $(this).find('.qty-est').text(q);
-      $(this).toggleClass('seleccion', q > 0);
+      $(this).find('.tarjeta__cantidad').text(q);
+      $(this).toggleClass('tarjeta--seleccion', q > 0);
     });
   }
 
-  // Ventana flotante con el detalle (todo con .text())
+  // Ventana flotante con el detalle (HTML sanitizado con DOMPurify)
   function abrirDetalle(id) {
     const e = porId(id);
     if (!e) return;
@@ -330,8 +366,7 @@ $(document).ready(function () {
     $('#detInsignia').text(ETIQUETA[e.tipo]);
     $('#detStock').text(e.stock + ' disponibles');
     $('#detPrecio').text(esSnack(e) ? e.precio + ' BOB por unidad' : e.precio + ' BOB / hora por máquina');
-    const $ul = $('#detLista').empty();
-    e.det.forEach(function (d) { $ul.append($('<li>').text(d)); });
+    renderizarDetalleSeguro(e.det.map(function (d) { return '<li>' + d + '</li>'; }).join(''));
     $('#detEnGrupo').text(enReservaTxt(e));
     $('#detAgregar').text(esSnack(e) ? '+ Agregar al pedido' : '+ Agregar al grupo');
     abrirModal('m-detalle');
@@ -341,14 +376,14 @@ $(document).ready(function () {
   function activarCatalogo() {
     $('#catalogoArcade').off('.cat');
 
-    $('#catalogoArcade').on('click.cat', '.abrir-det', function () {
-      abrirDetalle($(this).closest('.tarjeta-pista').data('id'));
+    $('#catalogoArcade').on('click.cat', '.js-detalle', function () {
+      abrirDetalle($(this).closest('.tarjeta').data('id'));
     });
-    $('#catalogoArcade').on('click.cat', '.btn-mas', function () {
-      agregarUno($(this).closest('.tarjeta-pista').data('id'));
+    $('#catalogoArcade').on('click.cat', '.js-mas', function () {
+      agregarUno($(this).closest('.tarjeta').data('id'));
     });
-    $('#catalogoArcade').on('click.cat', '.btn-menos', function () {
-      const id = $(this).closest('.tarjeta-pista').data('id');
+    $('#catalogoArcade').on('click.cat', '.js-menos', function () {
+      const id = $(this).closest('.tarjeta').data('id');
       setQty(id, (pedido[id] || 0) - 1);
     });
 
@@ -447,9 +482,9 @@ $(document).ready(function () {
       catActual = nombre;
       pagina = 0;
       const t = TEMAS[nombre];
-      // Cambio dinámico de temática e ícono (addClass / removeClass / .html)
+      // Cambio dinámico de temática e ícono (addClass / removeClass / .html sanitizado)
       $('#bannerTema').removeClass('tema-todos tema-ps5 tema-pc tema-arcade tema-snacks').addClass(t.clase);
-      $('#bannerIcono').html(t.icono);
+      htmlSeguro($('#bannerIcono'), t.icono);
       $('#bannerTitulo').text(t.titulo);
       $('#bannerSub').text(t.sub);
       $('.tab').removeClass('activo').filter('[data-tab="' + nombre + '"]').addClass('activo');

@@ -20,7 +20,6 @@ body {
   transition: background .3s, color .3s;
 }
 a { color: inherit; }
-.oculto { display: none !important; }
 h1, h2, h3 { margin: 0; }
 h2 { font-size: 1rem; color: var(--neon); margin-bottom: 8px; }
 .sub { color: var(--muted); margin: 0 0 8px; font-size: .85rem; }
@@ -136,14 +135,10 @@ body.teclado .bottom-nav { display: none; }
 .box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .box p { margin: 4px 0 0; color: var(--muted); }
 
-/* ---------- Imágenes con respaldo ---------- */
+/* ---------- Hero (imagen o video con respaldo) ---------- */
 .media { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .media > img, .media > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .emoji { font-size: 2rem; }
-.img-ps5 { background: linear-gradient(135deg, #001a66, #0070d1); }
-.img-pc { background: linear-gradient(135deg, #0a0a0a, #1f6f00); }
-.img-arcade { background: linear-gradient(135deg, #3b0030, #ff0055); }
-.img-snacks { background: linear-gradient(135deg, #7a2e00, #ff9f1c); }
 .img-todos { background: linear-gradient(135deg, #1b1b4b, #6a00f4, #ff2bd6); }
 
 /* ---------- Layout con panel lateral (el panel solo aparece en pantallas grandes) ---------- */
@@ -153,11 +148,12 @@ body.teclado .bottom-nav { display: none; }
 .lado-box > b { color: var(--text); }
 .lado-box p { margin: 4px 0 0; font-size: .85rem; }
 .estado-abierto { font-weight: 800; }
-.estado-abierto.si { color: var(--ok) !important; }
-.estado-abierto.no { color: var(--err) !important; }
+.estado-abierto.si { color: var(--ok); }
+.estado-abierto.no { color: var(--err); }
 .flash-promo { border-color: var(--neon2); box-shadow: 0 0 12px rgba(255,43,214,.25); }
 
-.pop-lista { list-style: none; margin: 8px 0 0; padding: 0; }
+/* CLS: se reserva el alto de la lista que se llena con JavaScript */
+.pop-lista { list-style: none; margin: 8px 0 0; padding: 0; min-height: 210px; }
 .pop-fila {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 6px 0; border-bottom: 1px dashed var(--line);
@@ -170,9 +166,9 @@ body.teclado .bottom-nav { display: none; }
 
 .mini-lista { list-style: none; margin: 0 0 8px; padding: 0; }
 .mini-lista li { display: flex; justify-content: space-between; padding: 4px 0; }
-.mini-total { border-top: 2px solid var(--line); margin-top: 4px; padding-top: 8px !important; }
+.mini-lista .mini-total { border-top: 2px solid var(--line); margin-top: 4px; padding-top: 8px; }
 .mini-total b { color: var(--neon); font-size: 1.15rem; }
-.mini-flash { color: var(--neon2) !important; font-weight: 700; margin: 0 0 8px !important; }
+.lado-box .mini-flash { color: var(--neon2); font-weight: 700; margin: 0 0 8px; }
 
 /* ---------- Inicio ---------- */
 .hero { flex: 1; min-height: 0; border-radius: 14px; align-items: flex-end; border: 1px solid var(--line); }
@@ -225,19 +221,38 @@ body.teclado .bottom-nav { display: none; }
 .cargando, .error-carga { text-align: center; color: var(--muted); padding: 20px; grid-column: 1 / -1; }
 .error-carga { color: var(--err); }
 
-.tarjeta-pista {
+/* ---------- Tarjeta del catálogo (BEM: bloque__elemento--modificador) ---------- */
+.tarjeta {
   display: flex; align-items: center; gap: 10px; min-width: 0; height: 84px; padding: 8px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; transition: box-shadow .2s;
 }
-.tarjeta-pista.seleccion { border-color: var(--neon); box-shadow: 0 0 14px var(--neon); }
-.miniatura { width: 64px; height: 64px; flex-shrink: 0; border-radius: 10px; cursor: pointer; }
-.miniatura .emoji { font-size: 1.8rem; }
-.stock { position: absolute; top: 3px; right: 3px; padding: 0 6px; border-radius: 10px; font-size: .65rem; font-weight: 800; color: #fff; background: rgba(0,0,0,.7); z-index: 1; }
-.stock.bajo { background: var(--err); }
-.info-pista { flex: 1; min-width: 0; cursor: pointer; }
-.info-pista h4 { margin: 0; font-size: .92rem; }
+.tarjeta--seleccion { border-color: var(--neon); box-shadow: 0 0 14px var(--neon); }
+
+/* CLS: tamaño fijo + aspect-ratio, la imagen no mueve el diseño al cargar */
+.tarjeta__imagen {
+  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  width: 64px; height: 64px; aspect-ratio: 1 / 1; flex-shrink: 0; border-radius: 10px; cursor: pointer;
+}
+.tarjeta__imagen--ps5    { background: linear-gradient(135deg, #001a66, #0070d1); }
+.tarjeta__imagen--pc     { background: linear-gradient(135deg, #0a0a0a, #1f6f00); }
+.tarjeta__imagen--arcade { background: linear-gradient(135deg, #3b0030, #ff0055); }
+.tarjeta__imagen--snacks { background: linear-gradient(135deg, #7a2e00, #ff9f1c); }
+
+.tarjeta__foto   { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.tarjeta__emoji  { font-size: 1.8rem; }
+.tarjeta__stock {
+  position: absolute; top: 3px; right: 3px; z-index: 1; padding: 0 6px; border-radius: 10px;
+  font-size: .65rem; font-weight: 800; color: #fff; background: rgba(0,0,0,.7);
+}
+.tarjeta__stock--bajo { background: var(--err); }
+
+.tarjeta__info     { flex: 1; min-width: 0; cursor: pointer; }
+.tarjeta__titulo   { margin: 0; font-size: .92rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tarjeta__precio   { margin: 0; font-size: .82rem; font-weight: 700; color: var(--neon2); }
+.tarjeta__mas      { display: block; font-size: .7rem; color: var(--muted); }
+.tarjeta__cantidad { min-width: 20px; text-align: center; font-weight: 800; }
+
 .precio { color: var(--neon2); font-weight: 700; margin: 0; font-size: .82rem; }
-.mas-det { color: var(--muted); font-size: .7rem; }
 .titulo-truncado { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .contador { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -248,7 +263,7 @@ body.teclado .bottom-nav { display: none; }
 .contador button:hover { background: var(--neon); color: #000; }
 .contador button:disabled { opacity: .35; cursor: default; }
 .contador button:disabled:hover { background: transparent; color: var(--neon); }
-.qty, .qty-est { min-width: 20px; text-align: center; font-weight: 800; }
+.qty { min-width: 20px; text-align: center; font-weight: 800; }
 
 .pager { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; color: var(--muted); }
 
@@ -314,7 +329,7 @@ body:not(.light) input[type="date"]::-webkit-calendar-picker-indicator { filter:
 .err { min-height: 14px; font-size: .72rem; color: var(--err); }
 .campo.invalido input, .campo.invalido select { border-color: var(--err); box-shadow: 0 0 6px rgba(255,77,77,.5); }
 .campo.valido input, .campo.valido select { border-color: var(--ok); }
-.check { display: flex !important; align-items: flex-start; gap: 8px; color: var(--text) !important; font-weight: 500 !important; }
+.campo .check { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text); font-weight: 500; }
 .check input { width: 22px; min-height: 22px; margin-top: 2px; }
 
 /* ---------- Historial: mis reservas ---------- */
@@ -557,10 +572,12 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 .chip-plazo { min-height: 44px; }
 
 .info-grid a { display: inline-flex; align-items: center; min-height: 44px; }
-.check { align-items: center; min-height: 44px; }
 
 /* Celulares de 360 px: con el plazo activo la barra superior no cabía */
 @media (max-width: 400px) {
   .logo { font-size: .95rem; }
   .chip { padding: 4px 8px; }
 }
+
+/* Utilidad: debe ir al final del archivo para ganar a las reglas que oculta */
+.oculto { display: none; }
