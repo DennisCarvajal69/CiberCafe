@@ -101,6 +101,21 @@ $(document).ready(function () {
   const ANCHO_MIN    = 270;   // ancho mínimo de una tarjeta
   const GAP          = 8;
 
+    /* ============================================
+     SUPABASE (base de datos remota)
+     ============================================ */
+  const SUPABASE_URL = 'https://qkmfgvrzuqgvkuywdqva.supabase.co';   // ← pega tu Project URL
+  const SUPABASE_KEY = 'sb_publishable_7ohEqoLIG1RW1nTCvYbO-A_MnvkDN6X';       // ← pega tu clave pública
+  const API          = SUPABASE_URL + '/rest/v1';
+
+  function supabaseListo() { return SUPABASE_URL.indexOf('TU-PROYECTO') === -1 && SUPABASE_KEY.indexOf('TU-CLAVE') === -1; }
+
+  function sbHeaders() {
+    const h = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' };
+    if (SUPABASE_KEY.indexOf('eyJ') === 0) h.Authorization = 'Bearer ' + SUPABASE_KEY;   // clave anon antigua (JWT)
+    return h;
+  }
+
   const TEMAS = {
     catalogo: { clase: 'tema-todos',  icono: '📚', titulo: 'Catálogo completo', sub: 'Máquinas y snacks' },
     ps5:      { clase: 'tema-ps5',    icono: '🎮', titulo: 'PlayStation 5',     sub: 'Solo estaciones PS5' },
@@ -232,13 +247,22 @@ $(document).ready(function () {
     }
   }
 
-  // Servidor simulado (0,6 s). Con un servidor real, aquí iría el fetch POST.
+    // Envía una reserva a Supabase. Sin configurar, se simula (0,6 s).
   function enviarAlServidor(item) {
-    return new Promise(function (ok) { setTimeout(ok, 600); });
+    if (!supabaseListo()) return new Promise(function (ok) { setTimeout(ok, 600); });
+    return fetch(API + '/reservas', {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify(item.fila)
+    }).then(function (res) {
+      if (res.ok || res.status === 409) return;   // 409 = ya estaba guardada (reintento)
+      throw new Error('Supabase respondió ' + res.status);
+    });
   }
 
-  // Vacía la cola de a una reserva (primero en entrar, primero en salir)
+    // Vacía la cola de a una reserva (primero en entrar, primero en salir)
   function procesarCola() {
+    sincronizarCancelaciones();
     if (enviando || !navigator.onLine || !colaSync.length) return;
     enviando = true;
     (function siguiente() {
@@ -250,7 +274,11 @@ $(document).ready(function () {
         marcarVerificada(item.codigo);
         guardar();
         siguiente();
-      }).catch(function () { enviando = false; });   // si falla, se queda en la cola para reintentar
+      }).catch(function (err) {
+        console.warn('Envío pendiente, se reintentará:', err);
+        enviando = false;
+        setTimeout(procesarCola, 10000);   // reintento en 10 s
+      });
     })();
   }
 
@@ -787,14 +815,25 @@ $(document).ready(function () {
         ' · ' + fmt(c.total) + ' BOB' + (c.flash ? ' · ⚡ Flash −15 %' : '');
       const cuando = $('#fecha').val().split('-').reverse().join('/') + ' · ' + $('#hora').val();
 
-      // UI optimista: se confirma al instante y nace "pendiente"
+            // UI optimista: se confirma al instante y nace "pendiente"
       const reserva = {
-        codigo: 'LU-' + Date.now().toString(36).toUpperCase().slice(-5),
+        codigo: 'LU-' + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 4).toUpperCase(),
+        token: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2),
         nombre: nombre, resumen: resumen, cuando: cuando, estado: 'pendiente'
       };
       reservas.unshift(reserva);
       if (reservas.length > 20) reservas.pop();
-      colaSync.push({ codigo: reserva.codigo, nombre: nombre, resumen: resumen });   // entra a la cola
+
+      // Fila que se enviará a Supabase (la cola es un array)
+      colaSync.push({
+        codigo: reserva.codigo,
+        fila: {
+          codigo: reserva.codigo, token: reserva.token,
+          nombre: nombre, ci: $('#ci').val(), celular: $('#tel').val(), correo: $('#email').val().trim(),
+          fecha: $('#fecha').val(), hora: $('#hora').val(), horas: c.horas,
+          resumen: resumen, total: fmt(c.total), flash: c.flash, estado: 'verificada'
+        }
+      });
 
       cerrarModal();
       reiniciarPedido(true);
@@ -919,14 +958,34 @@ $(document).ready(function () {
     guardar();
   }
 
-  function cancelarReserva(codigo) {
+    function cancelarReserva(codigo) {
     const r = reservas.find(function (x) { return x.codigo === codigo; });
     if (!r || r.estado === 'cancelada') return;
+    const nuncaSalio = colaSync.some(function (x) { return x.codigo === codigo; });
     r.estado = 'cancelada';
     // si estaba pendiente de envío, sale de la cola de sincronización
     colaSync = colaSync.filter(function (x) { return x.codigo !== codigo; });
+    if (!nuncaSalio && r.token) r.cancelPendiente = true;   // ya estaba en Supabase: hay que avisarle
     renderReservas();
     toast('🚫 Reserva ' + codigo + ' cancelada', 'error');
+    sincronizarCancelaciones();
+  }
+
+  // Avisa a Supabase las cancelaciones pendientes (si no hay red, quedan para después)
+  function sincronizarCancelaciones() {
+    if (!supabaseListo() || !navigator.onLine) return;
+    reservas.filter(function (r) { return r.estado === 'cancelada' && r.cancelPendiente && r.token; })
+      .forEach(function (r) {
+        fetch(API + '/rpc/cancelar_reserva', {
+          method: 'POST',
+          headers: sbHeaders(),
+          body: JSON.stringify({ p_codigo: r.codigo, p_token: r.token })
+        }).then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          delete r.cancelPendiente;
+          guardar();
+        }).catch(function (e) { console.warn('Cancelación pendiente:', e); });
+      });
   }
 
   // Delegación con .off().on(): los botones se redibujan en cada cambio
@@ -1004,9 +1063,10 @@ $(document).ready(function () {
     reservas = Array.isArray(s.reservas) ? s.reservas : [];
     colaSync = Array.isArray(s.colaSync) ? s.colaSync : [];
     // Reservas pendientes que no quedaron en la cola
+        // Una reserva "pendiente" sin su fila en la cola no se puede reenviar: queda marcada como local
     reservas.forEach(function (r) {
       if (r.estado === 'pendiente' && !colaSync.some(function (x) { return x.codigo === r.codigo; })) {
-        colaSync.push({ codigo: r.codigo, nombre: r.nombre, resumen: r.resumen });
+        r.estado = 'verificada';
       }
     });
 

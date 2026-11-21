@@ -1,4 +1,4 @@
-const CACHE_NAME = 'levelup-pwa-v7';
+const CACHE_NAME = 'levelup-pwa-v8';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -42,6 +42,7 @@ self.addEventListener('activate', function (event) {
 // Proxy invisible: responde desde caché (offline-first) y actualiza en segundo plano
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) return;
+    if (new URL(event.request.url).hostname.endsWith('.supabase.co')) return;
 
   event.respondWith(
     caches.match(event.request).then(function (cached) {
